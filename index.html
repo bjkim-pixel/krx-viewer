@@ -379,7 +379,7 @@ function cardHTML(d, i) {
   <div class="metrics">
     <div><div class="m-lbl">시가총액</div><div class="m-val">${capStr}</div></div>
     <div><div class="m-lbl">Q 대금비중</div><div class="m-val" style="color:var(--blue)">${d.Q.toFixed(4)}</div></div>
-    <div><div class="m-lbl">P 무게수</div><div class="m-val" style="color:var(--accent)">${d.P.toFixed(4)}</div></div>
+    <div><div class="m-lbl">P 무게수(%)</div><div class="m-val" style="color:var(--accent)">${d.P.toFixed(2)}%</div></div>
   </div>
   ${volBarHtml}
   <div class="inv-row">
@@ -399,9 +399,18 @@ function iChip(label, val) {
 
 // ─── 상세 이동 ───────────────────────────────────────────────────
 function goDetail(code) {
-  const s = allData.find(d => d.code === code); if (!s) return;
-  sessionStorage.setItem('detail_stock', JSON.stringify(s));
-  window.location.href = 'detail.html';
+  const s = allData.find(d => d.code === code);
+  if (!s) return;
+  // inv 포함한 전체 데이터를 그대로 저장
+  try {
+    sessionStorage.setItem('detail_stock', JSON.stringify(s));
+    window.location.href = 'detail.html';
+  } catch(e) {
+    // sessionStorage 용량 초과 시 inv.daily만 15개로 자름
+    const slim = {...s, inv: s.inv ? {...s.inv, daily: (s.inv.daily||[]).slice(0,15)} : null};
+    sessionStorage.setItem('detail_stock', JSON.stringify(slim));
+    window.location.href = 'detail.html';
+  }
 }
 
 // ─── 필터 ───────────────────────────────────────────────────────
