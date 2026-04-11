@@ -16,19 +16,21 @@ jobs:
   fetch-data:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # data/ 폴더에 JSON 커밋하기 위해 필요
+      contents: write
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: 저장소 체크아웃
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Python 설정
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.6.0
         with:
           python-version: '3.11'
 
       - name: 의존성 설치
-        run: pip install requests pandas openpyxl
+        run: pip install requests pandas openpyxl pykrx
 
       - name: KIS 데이터 수집 실행
         env:
