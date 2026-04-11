@@ -1,19 +1,13 @@
 """
 fetch_kis_data.py
 ─────────────────────────────────────────────
-GitHub Actions에서 실행되는 KIS API 데이터 수집 스크립트.
-Secrets에서 키를 읽어 아래 데이터를 수집하고 data/ 폴더에 JSON으로 저장합니다.
-
-수집 데이터:
-  - 주식현재가 시세 (종가, 등락률, 거래량, 52주/역대 신고가)
-  - 투자자별 매매동향 (외국인, 기관합계, 사모펀드 - 당일/15일)
-  - 일별 종가 (15일)
+흐름:
+  1. KIS 등락률순위 API(FHPST01710000)로 당일 상승 전 종목 수집
+     KOSPI / KOSDAQ 각각 조회 → 등락률 0% 초과 종목만
+  2. 종목별 신고가 여부 + 투자자 매매동향 + 일별시세(거래량 평균) 조회
+  3. data/today.json, data/meta.json 저장
 
 입력:  환경변수 KIS_APP_KEY, KIS_APP_SECRET
-       엑셀 업로드 없이 KIS API만으로 전 종목 데이터를 구성하는 것은
-       API 한도 초과 문제로 현실적이지 않아,
-       data/uploaded_stocks.json (수동 업로드 또는 별도 스크립트로 생성)에서
-       종목 리스트를 읽어 처리합니다.
 출력:  data/today.json, data/meta.json
 """
 
@@ -21,27 +15,24 @@ import os, sys, json, time, requests
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# ── 설정 ────────────────────────────────────────────────────────
-KIS_BASE    = 'https://openapi.koreainvestment.com:9443'
-APP_KEY     = os.environ.get('KIS_APP_KEY', '')
-APP_SECRET  = os.environ.get('KIS_APP_SECRET', '')
-DATA_DIR    = Path(__file__).parent.parent / 'data'
+# ── 설정 ──────────────────────────────────────────────────────────
+KIS_BASE         = 'https://openapi.koreainvestment.com:9443'
+APP_KEY          = os.environ.get('KIS_APP_KEY', '')
+APP_SECRET       = os.environ.get('KIS_APP_SECRET', '')
+DATA_DIR         = Path(__file__).parent.parent / 'data'
 DATA_DIR.mkdir(exist_ok=True)
 
-# 수동 실행 시 날짜 지정 가능
-TARGET_DATE = os.environ.get('TARGET_DATE', '').strip()
-TODAY       = TARGET_DATE if TARGET_DATE else datetime.now().strftime('%Y%m%d')
+TARGET_DATE      = os.environ.get('TARGET_DATE', '').strip()
+TODAY            = TARGET_DATE if TARGET_DATE else datetime.now().strftime('%Y%m%d')
+RATE_LIMIT_DELAY = 0.13   # 초당 ~7.5 req
+MAX_STOCKS       = 600    # 상승 종목 최대 처리 수
 
-RATE_LIMIT_DELAY = 0.13   # 초당 최대 ~7.5 req (KIS 권장: 20 req/s)
-MAX_STOCKS       = 500    # 처리할 최대 종목 수 (너무 많으면 시간 초과)
 
-# ── 인증 ─────────────────────────────────────────────────────────
+# ── 인증 ──────────────────────────────────────────────────────────
 def get_token():
-    """KIS OAuth2 액세스 토큰 발급"""
     if not APP_KEY or not APP_SECRET:
         print("❌ KIS_APP_KEY / KIS_APP_SECRET 환경변수가 없습니다.")
         sys.exit(1)
-
     res = requests.post(
         f'{KIS_BASE}/oauth2/tokenP',
         headers={'Content-Type': 'application/json'},
@@ -52,7 +43,7 @@ def get_token():
     if 'access_token' not in data:
         print(f"❌ 토큰 발급 실패: {data}")
         sys.exit(1)
-    print(f"✅ KIS 토큰 발급 성공 (만료: {data.get('access_token_token_expired', '?')})")
+    print("✅ KIS 토큰 발급 성공")
     return data['access_token']
 
 
@@ -66,36 +57,86 @@ def kis_headers(token, tr_id):
     }
 
 
-# ── 종목 리스트 로드 ─────────────────────────────────────────────
-def load_stock_list():
+# ── 1단계: 당일 상승 전 종목 수집 ─────────────────────────────────
+def fetch_rising_stocks(token):
     """
-    data/uploaded_stocks.json 에서 종목 리스트를 읽습니다.
-    파일이 없으면 KOSPI200 대표 종목으로 fallback.
+    등락률순위 API(FHPST01710000)로 당일 상승 종목 전체 수집.
+    KOSPI(0001) + KOSDAQ(1001) 각각 조회.
     """
-    stock_file = DATA_DIR / 'uploaded_stocks.json'
-    if stock_file.exists():
-        with open(stock_file, encoding='utf-8') as f:
-            stocks = json.load(f)
-        print(f"📂 uploaded_stocks.json 로드: {len(stocks)}개 종목")
-        return stocks[:MAX_STOCKS]
+    markets = [('0001', 'KOSPI'), ('1001', 'KOSDAQ')]
+    all_stocks = []
 
-    # fallback: 주요 종목 20개
-    print("⚠️ uploaded_stocks.json 없음 → 기본 종목 사용")
-    return [
-        {'code':'005930','name':'삼성전자','market':'KOSPI','cap':0,'rate':0,'Q':0,'P':0},
-        {'code':'000660','name':'SK하이닉스','market':'KOSPI','cap':0,'rate':0,'Q':0,'P':0},
-        {'code':'005380','name':'현대차','market':'KOSPI','cap':0,'rate':0,'Q':0,'P':0},
-        {'code':'051910','name':'LG화학','market':'KOSPI','cap':0,'rate':0,'Q':0,'P':0},
-        {'code':'035420','name':'NAVER','market':'KOSPI','cap':0,'rate':0,'Q':0,'P':0},
-        {'code':'035720','name':'카카오','market':'KOSPI','cap':0,'rate':0,'Q':0,'P':0},
-        {'code':'068270','name':'셀트리온','market':'KOSDAQ','cap':0,'rate':0,'Q':0,'P':0},
-        {'code':'247540','name':'에코프로비엠','market':'KOSDAQ','cap':0,'rate':0,'Q':0,'P':0},
-    ]
+    for mkt_code, mkt_name in markets:
+        print(f"\n📊 {mkt_name} 상승 종목 조회 중...")
+        try:
+            r = requests.get(
+                f'{KIS_BASE}/uapi/domestic-stock/v1/ranking/fluctuation',
+                params={
+                    'fid_cond_mrkt_div_code': 'J',
+                    'fid_cond_scr_div_code':  '20171',
+                    'fid_input_iscd':         mkt_code,
+                    'fid_rank_sort_cls_code': '0',    # 상승률순
+                    'fid_input_cnt_1':        '0',
+                    'fid_prc_cls_code':       '1',
+                    'fid_input_price_1':      '',
+                    'fid_input_price_2':      '',
+                    'fid_vol_cnt':            '',
+                    'fid_trgt_cls_code':      '0',
+                    'fid_trgt_exls_cls_code': '0',
+                    'fid_div_cls_code':       '0',
+                    'fid_rsfl_rate1':         '0',    # 등락률 0% 이상
+                    'fid_rsfl_rate2':         '',
+                },
+                headers=kis_headers(token, 'FHPST01710000'),
+                timeout=10
+            )
+            j = r.json()
+            if j.get('rt_cd') != '0':
+                print(f"  ⚠️ {mkt_name} 조회 실패: {j.get('msg1', '')}")
+                time.sleep(RATE_LIMIT_DELAY)
+                continue
+
+            rows = j.get('output', [])
+
+            def to_i(v): return int(str(v or '0').replace(',', '') or 0)
+            def to_f(v): return float(str(v or '0').replace(',', '') or 0)
+
+            count = 0
+            for row in rows:
+                rate = to_f(row.get('prdy_ctrt', 0))
+                if rate <= 0:
+                    continue
+                cap_eok = to_i(row.get('hts_avls', 0))
+                all_stocks.append({
+                    'code'  : str(row.get('stck_shrn_iscd', '')).zfill(6),
+                    'name'  : str(row.get('hts_kor_isnm', '')),
+                    'market': mkt_name,
+                    'close' : to_i(row.get('stck_prpr', 0)),
+                    'diff'  : to_i(row.get('prdy_vrss', 0)),
+                    'rate'  : round(rate, 2),
+                    'volume': to_i(row.get('acml_vol', 0)),
+                    'amount': to_i(row.get('acml_tr_pbmn', 0)),
+                    'cap'   : cap_eok * 100_000_000,
+                    'shares': to_i(row.get('lstn_stcn', 0)),
+                })
+                count += 1
+
+            print(f"  {mkt_name} 상승 종목: {count}개")
+
+        except Exception as e:
+            print(f"  ⚠️ {mkt_name} 조회 오류: {e}")
+
+        time.sleep(RATE_LIMIT_DELAY)
+
+    # 등락률 내림차순 정렬
+    all_stocks.sort(key=lambda x: x['rate'], reverse=True)
+    print(f"\n✅ 당일 상승 종목 총 {len(all_stocks)}개 수집")
+    return all_stocks[:MAX_STOCKS]
 
 
-# ── KIS API 호출 함수들 ──────────────────────────────────────────
-def fetch_price(token, code):
-    """주식현재가 시세 (FHKST01010100) - 종가, 등락률, 신고가 여부"""
+# ── 2단계: 종목별 상세 조회 함수들 ───────────────────────────────
+def fetch_price_detail(token, code):
+    """신고가 여부 조회 (FHKST01010100)"""
     try:
         r = requests.get(
             f'{KIS_BASE}/uapi/domestic-stock/v1/quotations/inquire-price',
@@ -110,14 +151,9 @@ def fetch_price(token, code):
         close    = int(o.get('stck_prpr', 0) or 0)
         w52_high = int(o.get('w52_hgpr', 0) or 0)
         return {
-            'close'  : close,
-            'diff'   : int(o.get('prdy_vrss', 0) or 0),
-            'rate'   : float(o.get('prdy_ctrt', 0) or 0),
-            'volume' : int(o.get('acml_vol', 0) or 0),
-            'amount' : int(o.get('acml_tr_pbmn', 0) or 0),
-            'cap'    : int(o.get('hts_avls', 0) or 0) * 100_000_000,  # 억 단위 → 원
-            'is52h'  : close > 0 and w52_high > 0 and close >= w52_high,
-            'isAllH' : o.get('new_hgpr_lwpr_cls_code') == '1',
+            'is52h' : close > 0 and w52_high > 0 and close >= w52_high,
+            'isAllH': o.get('new_hgpr_lwpr_cls_code') == '1',
+            'dept'  : str(o.get('bstp_kor_isnm', '')),
         }
     except Exception as e:
         print(f"  ⚠️ {code} 시세 오류: {e}")
@@ -125,7 +161,7 @@ def fetch_price(token, code):
 
 
 def fetch_investor(token, code):
-    """투자자별 매매동향 (FHKST01010900) - 외국인/기관/사모펀드 최근 30일"""
+    """투자자별 매매동향 (FHKST01010900)"""
     try:
         r = requests.get(
             f'{KIS_BASE}/uapi/domestic-stock/v1/quotations/inquire-investor',
@@ -142,7 +178,6 @@ def fetch_investor(token, code):
 
         def to_int(v): return int(v or 0)
 
-        # 당일
         t = arr[0]
         today_data = {
             'frgn': to_int(t.get('frgn_ntby_tr_pbmn')),
@@ -150,14 +185,12 @@ def fetch_investor(token, code):
             'priv': to_int(t.get('pvt_fund_ntby_tr_pbmn')),
         }
 
-        # 1주(5일)/1달(22일) 합계
         def sum_field(days, field):
-            return sum(to_int(r.get(field)) for r in arr[:days])
+            return sum(to_int(row.get(field)) for row in arr[:days])
 
         week_data  = {k: sum_field(5,  f) for k, f in [('frgn','frgn_ntby_tr_pbmn'),('inst','orgn_ntby_tr_pbmn'),('priv','pvt_fund_ntby_tr_pbmn')]}
         month_data = {k: sum_field(22, f) for k, f in [('frgn','frgn_ntby_tr_pbmn'),('inst','orgn_ntby_tr_pbmn'),('priv','pvt_fund_ntby_tr_pbmn')]}
 
-        # 15일 일별 내역 (오래된 순)
         daily = []
         for row in reversed(arr[:15]):
             daily.append({
@@ -174,7 +207,7 @@ def fetch_investor(token, code):
 
 
 def fetch_daily_price(token, code):
-    """기간별 일봉 시세 (FHKST03010100) - 최근 30일 (거래량 평균 계산용)"""
+    """기간별 일봉 (FHKST03010100) - 22일 평균 거래량 계산용"""
     try:
         end   = TODAY
         start = (datetime.strptime(TODAY, '%Y%m%d') - timedelta(days=50)).strftime('%Y%m%d')
@@ -194,7 +227,7 @@ def fetch_daily_price(token, code):
         j = r.json()
         if j.get('rt_cd') != '0':
             return []
-        rows = j.get('output2', [])  # 최신순
+        rows = j.get('output2', [])
         result = []
         for row in rows:
             result.append({
@@ -203,54 +236,69 @@ def fetch_daily_price(token, code):
                 'rate'  : float(row.get('prdy_ctrt', 0) or 0),
                 'volume': int(row.get('acml_vol', 0) or 0),
             })
-        return result  # 최신 데이터가 [0]
+        return result  # 최신이 [0]
     except Exception as e:
         print(f"  ⚠️ {code} 일별시세 오류: {e}")
         return []
 
 
-# ── 메인 ─────────────────────────────────────────────────────────
+# ── 메인 ──────────────────────────────────────────────────────────
 def main():
     print(f"\n{'='*50}")
     print(f"  KIS 데이터 수집 시작  [{TODAY}]")
-    print(f"{'='*50}\n")
+    print(f"{'='*50}")
 
     token  = get_token()
-    stocks = load_stock_list()
+    stocks = fetch_rising_stocks(token)
     total  = len(stocks)
+
+    if total == 0:
+        print("⚠️ 상승 종목이 없습니다. 장 마감 후 재실행하세요.")
+        with open(DATA_DIR / 'today.json', 'w') as f:
+            json.dump([], f)
+        with open(DATA_DIR / 'meta.json', 'w') as f:
+            json.dump({'date': TODAY, 'total': 0, 'generated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}, f)
+        return
+
+    print(f"\n{'='*50}")
+    print(f"  종목별 상세 조회 ({total}개)")
+    print(f"{'='*50}\n")
+
     result = []
 
     for idx, stock in enumerate(stocks, 1):
-        code = stock['code']
-        name = stock.get('name', code)
-        print(f"[{idx:3d}/{total}] {code} {name}")
+        code   = stock['code']
+        name   = stock['name']
+        volume = stock['volume']
+        amount = stock['amount']
+        cap    = stock['cap']
+        shares = stock['shares']
+        rate   = stock['rate']
 
-        # 시세 조회
-        price = fetch_price(token, code)
+        print(f"[{idx:3d}/{total}] {code} {name} ({rate:+.2f}%)")
+
+        # 신고가 조회
+        detail = fetch_price_detail(token, code)
         time.sleep(RATE_LIMIT_DELAY)
 
         # 투자자 조회
         investor = fetch_investor(token, code)
         time.sleep(RATE_LIMIT_DELAY)
 
-        # 일별 시세 (투자자 daily에 종가 병합용)
+        # 일별 시세
         daily_price = fetch_daily_price(token, code)
         time.sleep(RATE_LIMIT_DELAY)
 
-        # 투자자 daily에 종가·거래량 병합, 한달 평균 거래량 계산
+        # 22일 평균 거래량 계산
         vol_avg_22 = 0
         vol_ratio  = 0.0
         if daily_price:
-            # daily_price[0]이 최신(당일), [1]~[22]가 직전 22거래일
             past_22 = [r['volume'] for r in daily_price[1:23] if r['volume'] > 0]
             if past_22:
                 vol_avg_22 = int(sum(past_22) / len(past_22))
-                today_vol  = daily_price[0]['volume'] if daily_price else volume
-                vol_ratio  = round((today_vol / vol_avg_22) * 100, 1) if vol_avg_22 > 0 else 0.0
+                vol_ratio  = round((volume / vol_avg_22) * 100, 1) if vol_avg_22 > 0 else 0.0
 
-            # 투자자 daily(오래된 순)에 종가·거래량 병합
             if investor:
-                # daily_price는 최신순 → 날짜 맵
                 price_map = {r['date']: r for r in daily_price}
                 for row in investor['daily']:
                     pm = price_map.get(row['date'], {})
@@ -258,62 +306,53 @@ def main():
                     row['rate']   = pm.get('rate', 0)
                     row['volume'] = pm.get('volume', 0)
 
-        # 기본 필드 (업로드된 엑셀 값 우선, 없으면 KIS 값)
-        close  = (price or {}).get('close', 0) or stock.get('close', 0)
-        rate   = (price or {}).get('rate', 0)  or stock.get('rate', 0)
-        cap    = (price or {}).get('cap', 0)   or stock.get('cap', 0)
-        volume = (price or {}).get('volume', 0) or stock.get('volume', 0)
-        amount = (price or {}).get('amount', 0) or stock.get('amount', 0)
-        shares = stock.get('shares', 0)
+        # Q, P 계산
+        Q = round(amount / cap,              6) if cap    > 0 else 0.0
+        P = round(rate * volume / shares,    6) if shares > 0 else 0.0
 
-        # Q, P 재계산 (KIS 값 기반)
-        Q = (amount / cap)         if cap    > 0 else stock.get('Q', 0)
-        P = (rate * volume / shares) if shares > 0 else stock.get('P', 0)
-
-        entry = {
+        result.append({
             'code'     : code,
             'name'     : name,
-            'market'   : stock.get('market', ''),
-            'dept'     : stock.get('dept', ''),
-            'close'    : close,
-            'diff'     : (price or {}).get('diff', 0),
-            'rate'     : round(rate, 2),
+            'market'   : stock['market'],
+            'dept'     : (detail or {}).get('dept', ''),
+            'close'    : stock['close'],
+            'diff'     : stock['diff'],
+            'rate'     : rate,
             'volume'   : volume,
             'amount'   : amount,
             'cap'      : cap,
             'shares'   : shares,
-            'Q'        : round(Q, 6),
-            'P'        : round(P, 6),
-            'is52h'    : (price or {}).get('is52h', False),
-            'isAllH'   : (price or {}).get('isAllH', False),
-            'volAvg22' : vol_avg_22,   # 직전 22거래일 평균 거래량
-            'volRatio' : vol_ratio,    # 당일 거래량 / 22일 평균 (%, e.g. 250.0 = 250%)
-            'inv'      : investor,     # today/week/month/daily
-        }
-        result.append(entry)
+            'Q'        : Q,
+            'P'        : P,
+            'is52h'    : (detail or {}).get('is52h', False),
+            'isAllH'   : (detail or {}).get('isAllH', False),
+            'volAvg22' : vol_avg_22,
+            'volRatio' : vol_ratio,
+            'inv'      : investor,
+        })
 
     # ── 저장 ──────────────────────────────────────────────────────
-    out_path = DATA_DIR / 'today.json'
-    with open(out_path, 'w', encoding='utf-8') as f:
+    with open(DATA_DIR / 'today.json', 'w', encoding='utf-8') as f:
         json.dump(result, f, ensure_ascii=False, separators=(',', ':'))
 
     meta = {
-        'date'       : TODAY,
-        'generated'  : datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'total'      : len(result),
-        'up'         : sum(1 for r in result if r['rate'] > 0),
-        'down'       : sum(1 for r in result if r['rate'] < 0),
-        'new52h'     : sum(1 for r in result if r['is52h']),
-        'newAllH'    : sum(1 for r in result if r['isAllH']),
-        'volBurst'   : sum(1 for r in result if r['volRatio'] >= 200),
+        'date'     : TODAY,
+        'generated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'total'    : len(result),
+        'up'       : len(result),
+        'down'     : 0,
+        'new52h'   : sum(1 for r in result if r['is52h']),
+        'newAllH'  : sum(1 for r in result if r['isAllH']),
+        'volBurst' : sum(1 for r in result if r['volRatio'] >= 200),
     }
     with open(DATA_DIR / 'meta.json', 'w', encoding='utf-8') as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)
 
-    print(f"\n✅ 완료: {len(result)}개 종목 → data/today.json")
-    print(f"   52주신고가: {meta['new52h']}개 / 역대신고가: {meta['newAllH']}개")
+    print(f"\n{'='*50}")
+    print(f"✅ 완료: {len(result)}개 종목 저장")
+    print(f"   52주신고가: {meta['new52h']}개  역대신고가: {meta['newAllH']}개")
     print(f"   거래량급증(200%↑): {meta['volBurst']}개")
-    print(f"   상승: {meta['up']} / 하락: {meta['down']}")
+    print(f"{'='*50}")
 
 
 if __name__ == '__main__':
