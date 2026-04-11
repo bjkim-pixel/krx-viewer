@@ -194,7 +194,8 @@ function renderHeader(s) {
 function renderBasic(s) {
   $('i-cap').textContent = Math.round(s.cap / 1e8).toLocaleString() + '억';
   $('i-Q').textContent   = s.Q.toFixed(5);
-  $('i-P').textContent   = s.P.toFixed(5);
+  // P는 ×100 적용된 % 단위
+  $('i-P').textContent   = s.P.toFixed(2) + '%';
   $('i-vol').textContent = (s.volume || 0).toLocaleString();
 
   const vr  = s.volRatio  || 0;
@@ -217,15 +218,16 @@ function renderBasic(s) {
     $('vol-ratio-label').style.color   = color;
     $('vol-bar-fill').style.width      = pct + '%';
     $('vol-bar-fill').style.background = color;
-    // 100% 기준선 표시 (점선)
-    $('vol-bar-section').querySelector('div[style*="border-radius:4px;height"]').style.position = 'relative';
   }
 }
 
 // ── 투자자 요약 테이블 ─────────────────────────────────────────
 function renderInvestor(s) {
   const inv = s.inv;
-  if (!inv) return;
+  if (!inv) {
+    $('inv-body').innerHTML = '<div style="text-align:center;padding:16px;font-size:11px;color:var(--muted);font-family:var(--mono)">수급 데이터 없음<br><span style="font-size:10px;color:var(--muted)">Actions 재실행 후 확인하세요</span></div>';
+    return;
+  }
 
   const rows = [
     ['외국인',   'frgn'],
