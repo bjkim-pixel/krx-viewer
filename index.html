@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<title>KRX 주식 분석기</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#070a0f;--s1:#0d1117;--s2:#131a24;--border:#1a2535;
+  --accent:#00d68f;--blue:#1a8fff;--warn:#ff5757;--orange:#ff9500;
+  --text:#dde4f0;--muted:#3a4f6a;--dim:#7a90aa;
+  --up:#00d68f;--down:#ff4466;
+  --mono:'IBM Plex Mono',monospace;--sans:'Noto Sans KR',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+
+/* 헤더 */
+header{position:sticky;top:0;z-index:200;background:rgba(7,10,15,.97);
+  backdrop-filter:blur(16px);border-bottom:1px solid var(--border);
+  padding:11px 16px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent);
+  letter-spacing:.12em;display:flex;align-items:center;gap:7px}
+.logo-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 8px var(--accent);animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.hdr-r{display:flex;align-items:center;gap:8px}
+.hdr-date{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.hdr-badge{font-size:9px;font-family:var(--mono);padding:3px 8px;border-radius:10px}
+.badge-ok{background:rgba(0,214,143,.1);color:var(--accent);border:1px solid rgba(0,214,143,.2)}
+.badge-err{background:rgba(255,87,87,.1);color:var(--warn);border:1px solid rgba(255,87,87,.2)}
+.badge-load{background:rgba(26,143,255,.1);color:var(--blue);border:1px solid rgba(26,143,255,.2)}
+
+/* 요약 */
+#summary{display:none;padding:12px 16px 8px}
+.sum-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.sum-card{background:var(--s1);border:1px solid var(--border);border-radius:8px;padding:9px 8px;text-align:center}
+.s-lbl{font-size:9px;color:var(--muted);font-family:var(--mono);margin-bottom:3px;letter-spacing:.04em}
+.s-val{font-size:15px;font-weight:700;font-family:var(--mono)}
+
+/* 필터 */
+#filter-panel{display:none;padding:0 16px 8px}
+.f-ttl{font-size:9px;color:var(--muted);font-family:var(--mono);
+  letter-spacing:.1em;text-transform:uppercase;margin:7px 0 5px}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:2px}
+.chip{padding:5px 11px;border-radius:16px;border:1px solid var(--border);
+  background:var(--s1);font-size:11px;color:var(--dim);font-family:var(--mono);
+  cursor:pointer;transition:all .15s;user-select:none;white-space:nowrap}
+.chip.on{background:rgba(0,214,143,.12);border-color:var(--accent);color:var(--accent)}
+.chip.on.blue{background:rgba(26,143,255,.12);border-color:var(--blue);color:var(--blue)}
+.chip.on.org{background:rgba(255,149,0,.12);border-color:var(--orange);color:var(--orange)}
+.chip.on.purple{background:rgba(180,100,255,.12);border-color:#b464ff;color:#b464ff}
+.sort-row{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.s-lbl2{font-size:9px;color:var(--muted);font-family:var(--mono);min-width:28px}
+.sc{padding:4px 9px;border-radius:5px;border:1px solid var(--border);
+  background:var(--s1);font-size:10px;color:var(--dim);font-family:var(--mono);cursor:pointer;white-space:nowrap}
+.sc.on{background:var(--s2);border-color:var(--dim);color:var(--text)}
+#sort-dir{padding:4px 9px;border:1px solid var(--border);border-radius:5px;
+  font-size:12px;cursor:pointer;background:var(--s1);color:var(--dim)}
+
+/* 결과 헤더 */
+#result-row{display:none;padding:4px 16px 6px;align-items:center}
+.rc{font-size:10px;color:var(--dim);font-family:var(--mono)}
+.rc b{color:var(--accent)}
+
+/* 카드 */
+#stock-list{padding:0 16px 80px}
+.card{background:var(--s1);border:1px solid var(--border);border-radius:10px;
+  margin-bottom:7px;padding:11px 13px;cursor:pointer;
+  transition:border-color .15s,transform .1s;animation:fadeUp .2s ease both}
+.card:active{transform:scale(.99);border-color:var(--dim)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
+.tag-row{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;align-items:center}
+.tag{font-size:9px;font-family:var(--mono);padding:2px 7px;border-radius:3px}
+.t-kospi{background:rgba(26,143,255,.15);color:var(--blue)}
+.t-kosdaq{background:rgba(0,214,143,.12);color:var(--accent)}
+.t-other{background:rgba(58,79,106,.2);color:var(--dim)}
+.t-52h{background:rgba(255,149,0,.15);color:var(--orange);border:1px solid rgba(255,149,0,.3)}
+.t-allh{background:rgba(255,87,87,.15);color:var(--warn);border:1px solid rgba(255,87,87,.3);
+  animation:glow .9s alternate infinite}
+.t-vol{background:rgba(180,100,255,.15);color:#b464ff;border:1px solid rgba(180,100,255,.3)}
+@keyframes glow{to{box-shadow:0 0 6px rgba(255,87,87,.35)}}
+
+/* 거래량 비율 바 */
+.vol-bar-wrap{display:flex;align-items:center;gap:6px;margin-top:6px;
+  border-top:1px solid var(--border);padding-top:6px}
+.vol-bar-track{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;position:relative}
+.vol-bar-fill{height:100%;border-radius:3px;transition:width .3s}
+.vol-bar-fill.low{background:var(--dim)}
+.vol-bar-fill.mid{background:var(--orange)}
+.vol-bar-fill.high{background:#b464ff}
+.vol-bar-label{font-size:10px;font-family:var(--mono);white-space:nowrap;font-weight:600}
+.vol-bar-sub{font-size:9px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
+
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px}
+.c-name{font-size:14px;font-weight:500}
+.c-code{font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:1px}
+.c-right{text-align:right}
+.c-price{font-size:15px;font-weight:700;font-family:var(--mono)}
+.rate-b{font-size:11px;font-family:var(--mono);font-weight:600;
+  padding:2px 7px;border-radius:4px;margin-top:3px;display:inline-block}
+.up{color:var(--up)}.down{color:var(--down)}.flat{color:var(--dim)}
+.bup{background:rgba(0,214,143,.12)}.bdown{background:rgba(255,68,102,.12)}.bflat{background:rgba(58,79,106,.2)}
+
+.metrics{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;
+  border-top:1px solid var(--border);padding-top:7px;margin-bottom:7px}
+.m-lbl{font-size:9px;color:var(--muted);font-family:var(--mono);margin-bottom:2px;text-align:center}
+.m-val{font-size:11px;font-family:var(--mono);font-weight:500;text-align:center}
+
+.inv-row{display:flex;gap:4px}
+.inv-c{flex:1;text-align:center;padding:5px 2px;border-radius:5px;border:1px solid var(--border);background:var(--s2)}
+.inv-lbl{font-size:9px;color:var(--muted);font-family:var(--mono);margin-bottom:2px}
+.inv-val{font-size:10px;font-family:var(--mono);font-weight:600}
+.iv-b{color:var(--up)}.iv-s{color:var(--down)}.iv-n{color:var(--dim)}
+
+/* 빈/로딩 */
+#loading{display:block;text-align:center;padding:60px 16px}
+.spin{width:28px;height:28px;border:2px solid var(--border);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.load-msg{font-size:11px;color:var(--dim);font-family:var(--mono)}
+#empty{display:none;text-align:center;padding:48px 16px;color:var(--muted);font-size:13px}
+#error-msg{display:none;margin:16px;padding:14px 16px;background:rgba(255,87,87,.08);
+  border:1px solid rgba(255,87,87,.2);border-radius:10px;font-size:12px;
+  color:var(--warn);font-family:var(--mono);line-height:1.7}
+
+/* 하단 바 */
+#bot-bar{display:none;position:fixed;bottom:0;left:0;right:0;
+  background:rgba(7,10,15,.96);backdrop-filter:blur(12px);
+  border-top:1px solid var(--border);padding:9px 16px;
+  align-items:center;justify-content:space-between}
+.bb-l{font-size:10px;color:var(--dim);font-family:var(--mono)}
+.bb-l b{color:var(--accent)}
+.bb-r{display:flex;gap:6px}
+.bb-btn{font-size:10px;color:var(--muted);font-family:var(--mono);
+  background:none;border:1px solid var(--border);border-radius:5px;padding:4px 9px;cursor:pointer;
+  transition:border-color .15s,color .15s}
+.bb-btn:hover{color:var(--text);border-color:var(--dim)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="logo-dot"></div>KRX ANALYZER</div>
+  <div class="hdr-r">
+    <div class="hdr-date" id="hdr-date">—</div>
+    <div class="hdr-badge badge-load" id="hdr-badge">로딩 중</div>
+  </div>
+</header>
+
+<div id="summary">
+  <div class="sum-grid">
+    <div class="sum-card"><div class="s-lbl">TOTAL</div><div class="s-val" id="s-tot">—</div></div>
+    <div class="sum-card"><div class="s-lbl">FILTERED</div><div class="s-val" id="s-fil">—</div></div>
+    <div class="sum-card"><div class="s-lbl">AVG RATE</div><div class="s-val" id="s-avg" style="font-size:13px">—</div></div>
+    <div class="sum-card"><div class="s-lbl">↑ / ↓</div><div class="s-val" id="s-ud" style="font-size:12px">—</div></div>
+  </div>
+</div>
+
+<div id="filter-panel">
+  <div class="f-ttl">시장구분</div>
+  <div class="chips" id="c-mkt">
+    <div class="chip blue on" data-v="ALL">전체</div>
+    <div class="chip blue" data-v="KOSPI">KOSPI</div>
+    <div class="chip blue" data-v="KOSDAQ">KOSDAQ</div>
+  </div>
+  <div class="f-ttl">시가총액</div>
+  <div class="chips" id="c-cap">
+    <div class="chip on" data-v="0">전체</div>
+    <div class="chip" data-v="100000000000">1천억↑</div>
+    <div class="chip" data-v="500000000000">5천억↑</div>
+    <div class="chip" data-v="1000000000000">1조↑</div>
+  </div>
+  <div class="f-ttl">등락률</div>
+  <div class="chips" id="c-rate">
+    <div class="chip on" data-v="all">전체</div>
+    <div class="chip" data-v="up01">+0.1%↑</div>
+    <div class="chip" data-v="up">상승</div>
+    <div class="chip" data-v="dn">하락</div>
+  </div>
+  <div class="f-ttl">신고가</div>
+  <div class="chips" id="c-high">
+    <div class="chip on" data-v="all">전체</div>
+    <div class="chip org" data-v="w52">52주 신고가</div>
+    <div class="chip org" data-v="hist">역사적 신고가</div>
+  </div>
+  <div class="f-ttl">거래량 급증 (한달 평균 대비)</div>
+  <div class="chips" id="c-vol">
+    <div class="chip on" data-v="0">전체</div>
+    <div class="chip purple" data-v="150">150%↑</div>
+    <div class="chip purple" data-v="200">200%↑</div>
+    <div class="chip purple" data-v="300">300%↑</div>
+    <div class="chip purple" data-v="500">500%↑</div>
+  </div>
+  <div class="f-ttl">외국인 당일 매수</div>
+  <div class="chips" id="c-frgn">
+    <div class="chip on" data-v="all">전체</div>
+    <div class="chip" data-v="buy">순매수</div>
+    <div class="chip" data-v="sell">순매도</div>
+  </div>
+  <div class="f-ttl">정렬</div>
+  <div class="sort-row">
+    <span class="s-lbl2">기준</span>
+    <div class="chips" id="c-sort" style="margin:0;flex:1">
+      <div class="sc on" data-v="P">P무게수</div>
+      <div class="sc" data-v="Q">Q대금비중</div>
+      <div class="sc" data-v="rate">등락률</div>
+      <div class="sc" data-v="cap">시가총액</div>
+      <div class="sc" data-v="frgn">외국인</div>
+      <div class="sc" data-v="inst">기관</div>
+      <div class="sc" data-v="volRatio">거래량%</div>
+    </div>
+    <div id="sort-dir" onclick="toggleDir()">↓</div>
+  </div>
+</div>
+
+<div id="result-row" style="display:flex">
+  <div class="rc"><b id="rc-n">0</b>개 종목</div>
+</div>
+
+<div id="loading">
+  <div class="spin"></div>
+  <div class="load-msg">데이터 로딩 중...</div>
+</div>
+<div id="error-msg"></div>
+<div id="empty"><div style="font-size:36px;margin-bottom:10px">🔍</div>조건에 맞는 종목이 없습니다</div>
+<div id="stock-list"></div>
+
+<div id="bot-bar">
+  <div class="bb-l"><b id="bb-n">0</b>개 종목</div>
+  <div class="bb-r">
+    <button class="bb-btn" onclick="resetAll()">필터 초기화</button>
+    <button class="bb-btn" onclick="location.reload()">새로고침</button>
+  </div>
+</div>
+
+<script>
+// ─── 전역 상태 ──────────────────────────────────────────────────
+let allData=[], sortKey='P', sortAsc=false;
+let fMkt='ALL', fCap=0, fRate='all', fHigh='all', fFrgn='all', fVol=0;
+
+// ─── 초기화: JSON 로드 ──────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', loadData);
+
+async function loadData() {
+  try {
+    // meta.json 먼저
+    const metaRes = await fetch('data/meta.json?_=' + Date.now());
+    if (!metaRes.ok) throw new Error(`data/meta.json 없음 (${metaRes.status})\nGitHub Actions가 아직 실행되지 않았을 수 있습니다.`);
+    const meta = await metaRes.json();
+
+    // today.json
+    const dataRes = await fetch('data/today.json?_=' + Date.now());
+    if (!dataRes.ok) throw new Error(`data/today.json 없음 (${dataRes.status})`);
+    allData = await dataRes.json();
+
+    // 정규화
+    allData.forEach(d => {
+      d.frgn = d.inv?.today?.frgn ?? null;
+      d.inst = d.inv?.today?.inst ?? null;
+      d.priv = d.inv?.today?.priv ?? null;
+    });
+
+    // UI
+    $('loading').style.display = 'none';
+    $('hdr-date').textContent = fmtDate(meta.date);
+    setBadge('ok', `${meta.total.toLocaleString()}종목`);
+    $('summary').style.display = 'block';
+    $('filter-panel').style.display = 'block';
+    $('result-row').style.display = 'flex';
+    $('bot-bar').style.display = 'flex';
+    updateSummary();
+    setupFilters();
+    render();
+
+  } catch(e) {
+    $('loading').style.display = 'none';
+    setBadge('err', '로드 실패');
+    $('error-msg').style.display = 'block';
+    $('error-msg').innerHTML =
+      `❌ 데이터를 불러오지 못했습니다.<br><br>${e.message}<br><br>` +
+      `<b>해결 방법:</b><br>` +
+      `1. GitHub → Settings → Secrets에 KIS_APP_KEY, KIS_APP_SECRET 등록<br>` +
+      `2. Actions → KRX Daily Data Fetch → Run workflow 클릭<br>` +
+      `3. 워크플로우 완료 후 페이지 새로고침`;
+  }
+}
+
+function fmtDate(s) {
+  if (!s || s.length < 8) return s || '—';
+  return `${s.slice(0,4)}.${s.slice(4,6)}.${s.slice(6,8)}`;
+}
+
+function setBadge(type, text) {
+  const b = $('hdr-badge');
+  b.textContent = text;
+  b.className = 'hdr-badge badge-' + type;
+}
+
+// ─── 요약 ───────────────────────────────────────────────────────
+function updateSummary() {
+  const up  = allData.filter(d => d.rate > 0).length;
+  const dn  = allData.filter(d => d.rate < 0).length;
+  const avg = allData.reduce((a, d) => a + d.rate, 0) / (allData.length || 1);
+  $('s-tot').textContent = allData.length.toLocaleString();
+  $('s-avg').textContent = (avg >= 0 ? '+' : '') + avg.toFixed(2) + '%';
+  $('s-avg').className   = 's-val ' + cls(avg);
+  $('s-ud').innerHTML    = `<span class="up">${up.toLocaleString()}</span>/<span class="down">${dn.toLocaleString()}</span>`;
+}
+
+// ─── 렌더링 ─────────────────────────────────────────────────────
+function render() {
+  const data = getFiltered();
+  $('s-fil').textContent = data.length.toLocaleString();
+  $('rc-n').textContent  = data.length.toLocaleString();
+  $('bb-n').textContent  = data.length.toLocaleString();
+  $('empty').style.display = data.length ? 'none' : 'block';
+  $('stock-list').innerHTML = data.slice(0, 300).map((d, i) =>
+    cardHTML(d, i)
+  ).join('');
+}
+
+function getFiltered() {
+  let d = [...allData];
+  if (fMkt !== 'ALL')   d = d.filter(x => x.market === fMkt);
+  if (fCap > 0)         d = d.filter(x => x.cap >= fCap);
+  if (fRate === 'up01') d = d.filter(x => x.rate >= 0.1);
+  else if (fRate === 'up') d = d.filter(x => x.rate > 0);
+  else if (fRate === 'dn') d = d.filter(x => x.rate < 0);
+  if (fHigh === 'w52')  d = d.filter(x => x.is52h);
+  if (fHigh === 'hist') d = d.filter(x => x.isAllH);
+  if (fFrgn === 'buy')  d = d.filter(x => x.frgn !== null && x.frgn > 0);
+  if (fFrgn === 'sell') d = d.filter(x => x.frgn !== null && x.frgn < 0);
+  if (fVol > 0)         d = d.filter(x => (x.volRatio || 0) >= fVol);
+
+  const key = sortKey === 'frgn' ? 'frgn' : sortKey === 'inst' ? 'inst' : sortKey;
+  d.sort((a, b) => {
+    const va = a[key] ?? -Infinity, vb = b[key] ?? -Infinity;
+    return sortAsc ? va - vb : vb - va;
+  });
+  return d;
+}
+
+function cardHTML(d, i) {
+  const rc  = cls(d.rate), rbc = bcls(d.rate);
+  const sign = d.rate > 0 ? '+' : '';
+  const capStr = Math.round(d.cap / 1e8).toLocaleString() + '억';
+  const mTag = d.market === 'KOSPI' ? 't-kospi' : d.market === 'KOSDAQ' ? 't-kosdaq' : 't-other';
+  const tags = `<span class="tag ${mTag}">${d.market}</span>`
+    + (d.isAllH ? '<span class="tag t-allh">역대신고가 🔥</span>' : '')
+    + (d.is52h  ? '<span class="tag t-52h">52주신고가 ★</span>' : '')
+    + (d.volRatio >= 200 ? `<span class="tag t-vol">거래량 ${d.volRatio}%</span>` : '');
+
+  // 거래량 비율 바
+  const vr = d.volRatio || 0;
+  const vrFill = Math.min(vr, 500);                    // 최대 500%까지 표시
+  const vrW    = Math.round((vrFill / 500) * 100);
+  const vrCls  = vr >= 300 ? 'high' : vr >= 150 ? 'mid' : 'low';
+  const vrClr  = vr >= 300 ? '#b464ff' : vr >= 150 ? 'var(--orange)' : 'var(--dim)';
+  const volBarHtml = d.volAvg22
+    ? `<div class="vol-bar-wrap">
+        <div class="vol-bar-track"><div class="vol-bar-fill ${vrCls}" style="width:${vrW}%"></div></div>
+        <span class="vol-bar-label" style="color:${vrClr}">${vr > 0 ? vr.toFixed(0) + '%' : '—'}</span>
+        <span class="vol-bar-sub">vs 22일평균</span>
+      </div>`
+    : '';
+
+  return `<div class="card" onclick="goDetail('${d.code}')" style="animation-delay:${Math.min(i*20,300)}ms">
+  <div class="tag-row">${tags}</div>
+  <div class="card-top">
+    <div><div class="c-name">${d.name}</div><div class="c-code">${d.code}·${d.dept||'-'}</div></div>
+    <div class="c-right">
+      <div class="c-price ${rc}">${(d.close||0).toLocaleString()}</div>
+      <span class="rate-b ${rbc} ${rc}">${sign}${d.rate}% (${d.diff>0?'+':''}${(d.diff||0).toLocaleString()})</span>
+    </div>
+  </div>
+  <div class="metrics">
+    <div><div class="m-lbl">시가총액</div><div class="m-val">${capStr}</div></div>
+    <div><div class="m-lbl">Q 대금비중</div><div class="m-val" style="color:var(--blue)">${d.Q.toFixed(4)}</div></div>
+    <div><div class="m-lbl">P 무게수</div><div class="m-val" style="color:var(--accent)">${d.P.toFixed(4)}</div></div>
+  </div>
+  ${volBarHtml}
+  <div class="inv-row">
+    ${iChip('외국인', d.frgn)}
+    ${iChip('기관합계', d.inst)}
+    ${iChip('사모펀드', d.priv)}
+  </div>
+</div>`;
+}
+
+function iChip(label, val) {
+  const str  = val === null ? '—' : fmt억(val);
+  const vc   = val === null ? 'iv-n' : val > 0 ? 'iv-b' : val < 0 ? 'iv-s' : 'iv-n';
+  const pre  = val !== null && val > 0 ? '+' : '';
+  return `<div class="inv-c"><div class="inv-lbl">${label}</div><div class="inv-val ${vc}">${pre}${str}</div></div>`;
+}
+
+// ─── 상세 이동 ───────────────────────────────────────────────────
+function goDetail(code) {
+  const s = allData.find(d => d.code === code); if (!s) return;
+  sessionStorage.setItem('detail_stock', JSON.stringify(s));
+  window.location.href = 'detail.html';
+}
+
+// ─── 필터 ───────────────────────────────────────────────────────
+function setupFilters() {
+  chips('c-mkt',  (v, el) => { fMkt  = v; el?.classList.add('blue');   render(); }, 'blue');
+  chips('c-cap',  (v)     => { fCap  = Number(v); render(); });
+  chips('c-rate', (v)     => { fRate = v; render(); });
+  chips('c-high', (v, el) => { fHigh = v; el?.classList.add('org');    render(); }, 'org');
+  chips('c-frgn', (v)     => { fFrgn = v; render(); });
+  chips('c-vol',  (v, el) => { fVol  = Number(v); el?.classList.add('purple'); render(); }, 'purple');
+  document.getElementById('c-sort').addEventListener('click', e => {
+    const c = e.target.closest('[data-v]'); if (!c) return;
+    sortKey = c.dataset.v;
+    document.querySelectorAll('#c-sort [data-v]').forEach(x => x.classList.toggle('on', x === c));
+    render();
+  });
+}
+
+function chips(id, cb, cls) {
+  document.getElementById(id).addEventListener('click', e => {
+    const c = e.target.closest('[data-v]'); if (!c) return;
+    document.querySelectorAll(`#${id} [data-v]`).forEach(x => { x.classList.remove('on'); if(cls) x.classList.remove(cls); });
+    c.classList.add('on'); cb(c.dataset.v, c);
+  });
+}
+
+function toggleDir() { sortAsc = !sortAsc; $('sort-dir').textContent = sortAsc ? '↑' : '↓'; render(); }
+
+function resetAll() {
+  fMkt='ALL'; fCap=0; fRate='all'; fHigh='all'; fFrgn='all'; fVol=0; sortKey='P'; sortAsc=false;
+  [['c-mkt','ALL','blue'],['c-cap','0',null],['c-rate','all',null],
+   ['c-high','all','org'],['c-frgn','all',null],['c-vol','0','purple']].forEach(([id,v,cls])=>{
+    document.querySelectorAll(`#${id} [data-v]`).forEach(c=>{
+      c.classList.remove('on'); if(cls)c.classList.remove(cls);
+      if(c.dataset.v===v){c.classList.add('on');if(cls)c.classList.add(cls);}
+    });
+  });
+  document.querySelectorAll('#c-sort [data-v]').forEach(c=>c.classList.toggle('on',c.dataset.v==='P'));
+  $('sort-dir').textContent='↓'; render();
+}
+
+// ─── 유틸 ───────────────────────────────────────────────────────
+const $   = id => document.getElementById(id);
+const cls = v  => v > 0 ? 'up' : v < 0 ? 'down' : 'flat';
+const bcls= v  => v > 0 ? 'bup' : v < 0 ? 'bdown' : 'bflat';
+
+function fmt억(v) {
+  if (v === null || v === undefined) return '—';
+  const a = Math.abs(v), pre = v < 0 ? '-' : '';
+  if (a >= 1e12) return pre + (a/1e12).toFixed(1) + '조';
+  if (a >= 1e8)  return pre + (a/1e8).toFixed(1) + '억';
+  if (a >= 1e4)  return pre + (a/1e4).toFixed(0) + '만';
+  return v.toLocaleString();
+}
+</script>
+</body>
+</html>
