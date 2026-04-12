@@ -30,7 +30,7 @@ jobs:
           python-version: '3.11'
 
       - name: 의존성 설치
-        run: pip install requests pandas openpyxl pykrx
+        run: pip install requests pandas openpyxl
 
       - name: KIS 데이터 수집 실행
         env:
