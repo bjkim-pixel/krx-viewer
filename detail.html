@@ -8,15 +8,13 @@
 <style>
 :root{
   --bg:#070a0f;--s1:#0d1117;--s2:#131a24;--border:#1a2535;
-  --accent:#00d68f;--blue:#1a8fff;--warn:#ff5757;--orange:#ff9500;
-  --text:#dde4f0;--muted:#3a4f6a;--dim:#7a90aa;
-  --up:#00d68f;--down:#ff4466;
+  --accent:#00d68f;--blue:#1a8fff;--warn:#ff5757;--orange:#ff9500;--purple:#b464ff;
+  --text:#dde4f0;--muted:#3a4f6a;--dim:#7a90aa;--up:#00d68f;--down:#ff4466;
   --mono:'IBM Plex Mono',monospace;--sans:'Noto Sans KR',sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh}
 
-/* 헤더 */
 header{position:sticky;top:0;z-index:100;background:rgba(7,10,15,.97);
   backdrop-filter:blur(16px);border-bottom:1px solid var(--border);
   padding:11px 16px;display:flex;align-items:center;gap:10px}
@@ -29,10 +27,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(7,10,15,.97);
 .hdr-close{font-size:16px;font-weight:700;font-family:var(--mono)}
 .hdr-rate{font-size:11px;font-family:var(--mono);font-weight:600;
   padding:2px 7px;border-radius:4px;margin-top:2px;display:inline-block}
-.up{color:var(--up)}.down{color:var(--down)}.flat{color:var(--dim)}
-.bup{background:rgba(0,214,143,.12)}.bdown{background:rgba(255,68,102,.12)}.bflat{background:rgba(58,79,106,.2)}
 
-/* 태그 배너 */
 .tag-banner{padding:8px 16px;display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--border)}
 .tag{font-size:10px;font-family:var(--mono);padding:3px 9px;border-radius:4px}
 .t-kospi{background:rgba(26,143,255,.15);color:var(--blue)}
@@ -42,7 +37,6 @@ header{position:sticky;top:0;z-index:100;background:rgba(7,10,15,.97);
 .t-allh{background:rgba(255,87,87,.15);color:var(--warn);border:1px solid rgba(255,87,87,.3);animation:glow .9s alternate infinite}
 @keyframes glow{to{box-shadow:0 0 6px rgba(255,87,87,.35)}}
 
-/* 콘텐츠 */
 .content{padding:14px 16px 80px}
 
 .sec-hdr{font-size:10px;color:var(--muted);font-family:var(--mono);
@@ -56,13 +50,23 @@ header{position:sticky;top:0;z-index:100;background:rgba(7,10,15,.97);
 .ic-lbl{font-size:9px;color:var(--muted);font-family:var(--mono);margin-bottom:3px}
 .ic-val{font-size:13px;font-weight:600;font-family:var(--mono)}
 
+/* 거래량 바 */
+#vol-bar-wrap{display:none;background:var(--s1);border:1px solid var(--border);
+  border-radius:8px;padding:12px 14px;margin-top:6px}
+.vb-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.vb-lbl{font-size:9px;color:var(--muted);font-family:var(--mono)}
+.vb-val{font-size:14px;font-weight:700;font-family:var(--mono)}
+.vb-track{background:var(--border);border-radius:4px;height:8px;overflow:hidden;margin-bottom:4px}
+.vb-fill{height:100%;border-radius:4px;transition:width .5s}
+.vb-scale{display:flex;justify-content:space-between}
+.vb-scale span{font-size:9px;color:var(--muted);font-family:var(--mono)}
+
 /* 투자자 테이블 */
 .inv-tbl{background:var(--s1);border:1px solid var(--border);border-radius:10px;overflow:hidden}
 .inv-head{display:grid;grid-template-columns:72px repeat(3,1fr);
   background:var(--s2);padding:7px 10px;border-bottom:1px solid var(--border)}
 .inv-th{font-size:9px;color:var(--muted);font-family:var(--mono);text-align:center}
 .inv-th:first-child{text-align:left}
-.inv-body{}
 .inv-tr{display:grid;grid-template-columns:72px repeat(3,1fr);
   padding:8px 10px;border-bottom:1px solid var(--border)}
 .inv-tr:last-child{border-bottom:none}
@@ -72,21 +76,31 @@ header{position:sticky;top:0;z-index:100;background:rgba(7,10,15,.97);
 
 /* 15일 테이블 */
 .day-tbl{background:var(--s1);border:1px solid var(--border);border-radius:10px;overflow:hidden}
-.day-head{display:grid;grid-template-columns:46px 56px 60px 1fr 1fr 1fr;
+.day-head{display:grid;grid-template-columns:46px 56px 56px 1fr 1fr 1fr;
   background:var(--s2);padding:7px 8px;border-bottom:1px solid var(--border)}
 .day-th{font-size:9px;color:var(--muted);font-family:var(--mono);text-align:center}
 .day-th:first-child{text-align:left}
-.day-row{display:grid;grid-template-columns:46px 56px 60px 1fr 1fr 1fr;
+.day-row{display:grid;grid-template-columns:46px 56px 56px 1fr 1fr 1fr;
   padding:6px 8px;border-bottom:1px solid var(--border);align-items:center}
 .day-row:last-child{border-bottom:none}
 .day-td{font-size:10px;font-family:var(--mono);text-align:center}
 .day-td:first-child{text-align:left;color:var(--dim)}
 
-/* 미니 바 */
 .bar-w{display:flex;align-items:center;gap:3px;justify-content:center}
 .bar{height:10px;border-radius:2px;min-width:2px}
 .b-up{background:rgba(0,214,143,.55)}.b-dn{background:rgba(255,68,102,.55)}.b-0{background:var(--border)}
 .bnum{font-size:8px;font-family:var(--mono);min-width:26px;text-align:left}
+
+/* 로딩/없음 */
+.no-kis{background:rgba(255,149,0,.08);border:1px solid rgba(255,149,0,.2);border-radius:8px;
+  padding:12px;text-align:center;font-size:11px;color:var(--orange);font-family:var(--mono);line-height:1.7}
+.sec-spin{text-align:center;padding:20px;font-size:11px;color:var(--muted);font-family:var(--mono)}
+.spin-sm{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.up{color:var(--up)}.down{color:var(--down)}.flat{color:var(--dim)}
+.bup{background:rgba(0,214,143,.12)}.bdown{background:rgba(255,68,102,.12)}.bflat{background:rgba(58,79,106,.2)}
 </style>
 </head>
 <body>
@@ -108,46 +122,230 @@ header{position:sticky;top:0;z-index:100;background:rgba(7,10,15,.97);
 <div class="content">
 
   <div class="sec-hdr">기본 지표</div>
-  <div class="info-grid">
-    <div class="ic"><div class="ic-lbl">시가총액</div><div class="ic-val" id="i-cap">—</div></div>
-    <div class="ic"><div class="ic-lbl">Q 대금비중</div><div class="ic-val" style="color:var(--blue)" id="i-Q">—</div></div>
-    <div class="ic"><div class="ic-lbl">P 무게수</div><div class="ic-val" style="color:var(--accent)" id="i-P">—</div></div>
-    <div class="ic"><div class="ic-lbl">당일 거래량</div><div class="ic-val" id="i-vol">—</div></div>
-    <div class="ic"><div class="ic-lbl">22일 평균 거래량</div><div class="ic-val" id="i-avg-vol">—</div></div>
-    <div class="ic"><div class="ic-lbl">거래량 비율</div><div class="ic-val" id="i-vol-ratio">—</div></div>
-  </div>
-  <!-- 거래량 비율 바 -->
-  <div id="vol-bar-section" style="display:none;margin-top:8px;padding:10px 12px;
-    background:var(--s1);border:1px solid var(--border);border-radius:8px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <span style="font-size:9px;color:var(--muted);font-family:var(--mono);letter-spacing:.05em">거래량 vs 22일 평균</span>
-      <span id="vol-ratio-label" style="font-size:13px;font-weight:700;font-family:var(--mono)">—</span>
+  <div class="info-grid" id="basic-grid"></div>
+  <div id="vol-bar-wrap">
+    <div class="vb-top">
+      <span class="vb-lbl">거래량 vs 22일 평균</span>
+      <span class="vb-val" id="vb-val">—</span>
     </div>
-    <div style="background:var(--border);border-radius:4px;height:8px;overflow:hidden">
-      <div id="vol-bar-fill" style="height:100%;border-radius:4px;transition:width .5s;width:0%"></div>
-    </div>
-    <div style="display:flex;justify-content:space-between;margin-top:4px">
-      <span style="font-size:9px;color:var(--muted);font-family:var(--mono)">0%</span>
-      <span style="font-size:9px;color:var(--muted);font-family:var(--mono)">100%(평균)</span>
-      <span style="font-size:9px;color:var(--muted);font-family:var(--mono)">500%+</span>
-    </div>
+    <div class="vb-track"><div class="vb-fill" id="vb-fill" style="width:0%"></div></div>
+    <div class="vb-scale"><span>0%</span><span>100%(평균)</span><span>500%+</span></div>
   </div>
 
   <div class="sec-hdr">외국인 · 기관 · 사모펀드 매매동향</div>
-  <div class="inv-tbl">
+  <div id="inv-section">
+    <div class="sec-spin"><div class="spin-sm"></div>KIS API 조회 중...</div>
+  </div>
+
+  <div class="sec-hdr">15일 일별 시세 & 투자자 거래대금</div>
+  <div id="daily-section">
+    <div class="sec-spin"><div class="spin-sm"></div>조회 중...</div>
+  </div>
+
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const KIS = 'https://openapi.koreainvestment.com:9443';
+let s = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const raw = sessionStorage.getItem('detail_stock');
+  if (!raw) { history.back(); return; }
+  s = JSON.parse(raw);
+
+  const kisToken  = sessionStorage.getItem('kis_token')  || '';
+  const kisKey    = sessionStorage.getItem('kis_key')    || '';
+  const kisSecret = sessionStorage.getItem('kis_secret') || '';
+
+  renderHeader();
+  renderBasic();
+
+  if (!kisToken) {
+    $('inv-section').innerHTML  = '<div class="no-kis">KIS API 미연결<br>목록 화면에서 KIS API 연결 후 다시 열어주세요</div>';
+    $('daily-section').innerHTML = '<div class="no-kis">KIS API 미연결</div>';
+    return;
+  }
+
+  const hdr = trId => ({
+    'authorization':'Bearer '+kisToken, 'appkey':kisKey, 'appsecret':kisSecret,
+    'tr_id':trId, 'Content-Type':'application/json'
+  });
+
+  // 이미 로드된 데이터 있으면 바로 표시
+  if (s._inv) {
+    renderInvestor(s._inv);
+    renderDaily(s._inv.daily);
+  } else {
+    // KIS API 실시간 조회
+    await loadKIS(hdr);
+  }
+});
+
+function renderHeader() {
+  const rc=cls(s.rate), rbc=bcls(s.rate);
+  $('h-name').textContent = s.name;
+  $('h-meta').textContent = `${s.code} · ${s.market} · ${s.dept||'-'}`;
+  $('h-close').textContent = (s.close||0).toLocaleString();
+  $('h-close').className = 'hdr-close '+rc;
+  $('h-rate').textContent = `${s.rate>0?'+':''}${s.rate}% (${s.diff>0?'+':''}${(s.diff||0).toLocaleString()})`;
+  $('h-rate').className = `hdr-rate ${rbc} ${rc}`;
+  const mTag = s.market==='KOSPI'?'t-kospi':s.market==='KOSDAQ'?'t-kosdaq':'t-other';
+  $('tag-banner').innerHTML =
+    `<span class="tag ${mTag}">${s.market}</span>`
+    +(s.isAllH?'<span class="tag t-allh">역대신고가🔥</span>':'')
+    +(s.is52h ?'<span class="tag t-52h">52주신고가★</span>':'')
+    +(s.dept  ?`<span class="tag" style="background:rgba(58,79,106,.2);color:var(--dim)">${s.dept}</span>`:'');
+}
+
+function renderBasic() {
+  const capStr = s.cap>0 ? Math.round(s.cap/1e8).toLocaleString()+'억' : '—';
+  const items = [
+    ['시가총액', capStr, ''],
+    ['등락률', (s.rate>0?'+':'')+s.rate+'%', cls(s.rate)],
+    ['종가', (s.close||0).toLocaleString(), cls(s.rate)],
+  ];
+  if (s.P !== null) items.push(['P 무게수(%)', s.P.toFixed(2)+'%', 'color:var(--accent)']);
+  if (s.Q !== null) items.push(['Q 대금비중', s.Q.toFixed(5), 'color:var(--blue)']);
+  if (s.volume) items.push(['거래량', s.volume.toLocaleString(), '']);
+
+  $('basic-grid').innerHTML = items.map(([l,v,c]) =>
+    `<div class="ic"><div class="ic-lbl">${l}</div><div class="ic-val" style="${c.includes('color')?c:''}" class="${c}">${v}</div></div>`
+  ).join('');
+
+  // 거래량 바
+  const vr = s.volRatio||0, avg = s.volAvg22||0;
+  if (avg>0) {
+    $('vol-bar-wrap').style.display='block';
+    const pct=Math.min(vr/500*100,100);
+    const color=vr>=300?'var(--purple)':vr>=150?'var(--orange)':'var(--dim)';
+    $('vb-val').textContent=vr.toFixed(0)+'%';
+    $('vb-val').style.color=color;
+    $('vb-fill').style.width=pct+'%';
+    $('vb-fill').style.background=color;
+  }
+}
+
+async function loadKIS(hdr) {
+  try {
+    // 투자자 조회
+    const iRes = await fetch(
+      `${KIS}/uapi/domestic-stock/v1/quotations/inquire-investor?FID_COND_MRKT_DIV_CODE=J&FID_INPUT_ISCD=${s.code}`,
+      { headers: hdr('FHKST01010900') }
+    );
+    const ij = await iRes.json();
+
+    if (ij.rt_cd==='0' && ij.output?.length) {
+      const arr = ij.output;
+      const ti = v => parseInt(v||0);
+      const sum = (days,f) => arr.slice(0,days).reduce((a,r)=>a+ti(r[f]),0);
+      const inv = {
+        today: {frgn:ti(arr[0].frgn_ntby_tr_pbmn), inst:ti(arr[0].orgn_ntby_tr_pbmn), priv:ti(arr[0].pvt_fund_ntby_tr_pbmn)},
+        week : {frgn:sum(5,'frgn_ntby_tr_pbmn'),   inst:sum(5,'orgn_ntby_tr_pbmn'),   priv:sum(5,'pvt_fund_ntby_tr_pbmn')},
+        month: {frgn:sum(22,'frgn_ntby_tr_pbmn'),  inst:sum(22,'orgn_ntby_tr_pbmn'),  priv:sum(22,'pvt_fund_ntby_tr_pbmn')},
+        daily: arr.slice(0,15).reverse().map(r=>({
+          date:r.stck_bsop_date, frgn:ti(r.frgn_ntby_tr_pbmn),
+          inst:ti(r.orgn_ntby_tr_pbmn), priv:ti(r.pvt_fund_ntby_tr_pbmn),
+          close:0, rate:0, volume:0,
+        })),
+      };
+
+      // 일별 시세 조회 (종가 + 거래량 병합)
+      await new Promise(r=>setTimeout(r,130));
+      try {
+        const end = formatDate(new Date());
+        const start = formatDate(new Date(Date.now()-35*86400000));
+        const dRes = await fetch(
+          `${KIS}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice?FID_COND_MRKT_DIV_CODE=J&FID_INPUT_ISCD=${s.code}&FID_INPUT_DATE_1=${start}&FID_INPUT_DATE_2=${end}&FID_PERIOD_DIV_CODE=D&FID_ORG_ADJ_PRC=0`,
+          { headers: hdr('FHKST03010100') }
+        );
+        const dj = await dRes.json();
+        if (dj.rt_cd==='0' && dj.output2?.length) {
+          const pm = {};
+          for (const r of dj.output2) {
+            pm[r.stck_bsop_date] = {
+              close: parseInt(r.stck_clpr||0),
+              rate:  parseFloat(r.prdy_ctrt||0),
+              volume:parseInt(r.acml_vol||0),
+            };
+          }
+          for (const row of inv.daily) {
+            const p = pm[row.date]||{};
+            row.close=p.close||0; row.rate=p.rate||0; row.volume=p.volume||0;
+          }
+          // 22일 평균 거래량 (없었으면 보완)
+          if (!s.volAvg22 && dj.output2.length>1) {
+            const vols = dj.output2.slice(1,23).map(r=>parseInt(r.acml_vol||0)).filter(v=>v>0);
+            if (vols.length) {
+              s.volAvg22 = Math.round(vols.reduce((a,b)=>a+b,0)/vols.length);
+              s.volRatio = s.volume ? Math.round(s.volume/s.volAvg22*100*10)/10 : 0;
+              renderBasic(); // 거래량 바 업데이트
+            }
+          }
+        }
+      } catch(e) {}
+
+      renderInvestor(inv);
+      renderDaily(inv.daily);
+    } else {
+      $('inv-section').innerHTML = `<div class="no-kis">수급 데이터 없음 (${ij.msg1||''})</div>`;
+      $('daily-section').innerHTML = '<div class="no-kis">일별 데이터 없음</div>';
+    }
+  } catch(e) {
+    $('inv-section').innerHTML = `<div class="no-kis">조회 실패: ${e.message}</div>`;
+    $('daily-section').innerHTML = '';
+  }
+}
+
+function renderInvestor(inv) {
+  const rows = [['외국인','frgn'],['기관합계','inst'],['사모펀드','priv']].map(([label,key]) => {
+    const cells = ['today','week','month'].map(p => {
+      const v = inv[p]?.[key]??null;
+      const vc = v===null?'tv-n':v>0?'tv-b':v<0?'tv-s':'tv-n';
+      return `<div class="inv-td"><span class="${vc}">${v===null?'—':(v>0?'+':'')+fmt억(v)}</span></div>`;
+    }).join('');
+    return `<div class="inv-tr"><div class="inv-td">${label}</div>${cells}</div>`;
+  }).join('');
+
+  $('inv-section').innerHTML = `<div class="inv-tbl">
     <div class="inv-head">
       <div class="inv-th">구분</div>
       <div class="inv-th">당일</div>
       <div class="inv-th">1주(5일)</div>
       <div class="inv-th">1달(22일)</div>
     </div>
-    <div class="inv-body" id="inv-body">
-      <div style="text-align:center;padding:16px;font-size:11px;color:var(--muted);font-family:var(--mono)">데이터 없음</div>
-    </div>
-  </div>
+    ${rows}
+  </div>`;
+}
 
-  <div class="sec-hdr">15일 일별 시세 & 투자자 거래대금</div>
-  <div class="day-tbl">
+function renderDaily(daily) {
+  if (!daily?.length) { $('daily-section').innerHTML='<div class="no-kis">데이터 없음</div>'; return; }
+  const vals = daily.flatMap(r=>[Math.abs(r.frgn||0),Math.abs(r.inst||0),Math.abs(r.priv||0)]);
+  const maxV = Math.max(...vals,1);
+  const volAvg = s.volAvg22||0;
+
+  const rows = daily.map(r => {
+    const dt = r.date||'';
+    const dtFmt = dt.length>=8 ? `${dt.slice(4,6)}/${dt.slice(6,8)}` : '—';
+    const rc = cls(r.rate||0);
+    const vol = r.volume||0;
+    let volStr = vol>0 ? (vol>=1e4?(vol/1e4).toFixed(0)+'만':vol.toLocaleString()) : '—';
+    if (volAvg>0 && vol>0) {
+      const ratio=vol/volAvg*100;
+      const vc=ratio>=300?'var(--purple)':ratio>=150?'var(--orange)':'var(--dim)';
+      volStr=`<span style="color:${vc};font-weight:600">${volStr}</span>`;
+    }
+    return `<div class="day-row">
+      <div class="day-td">${dtFmt}</div>
+      <div class="day-td"><span class="${rc}">${(r.close||0).toLocaleString()}</span></div>
+      <div class="day-td">${volStr}</div>
+      <div class="day-td">${miniBar(r.frgn,maxV)}</div>
+      <div class="day-td">${miniBar(r.inst,maxV)}</div>
+      <div class="day-td">${miniBar(r.priv,maxV)}</div>
+    </div>`;
+  }).join('');
+
+  $('daily-section').innerHTML = `<div class="day-tbl">
     <div class="day-head">
       <div class="day-th">날짜</div>
       <div class="day-th">종가</div>
@@ -156,165 +354,30 @@ header{position:sticky;top:0;z-index:100;background:rgba(7,10,15,.97);
       <div class="day-th">기관합계</div>
       <div class="day-th">사모펀드</div>
     </div>
-    <div id="day-body"></div>
-  </div>
-
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  const raw = sessionStorage.getItem('detail_stock');
-  if (!raw) { history.back(); return; }
-  const s = JSON.parse(raw);
-  renderHeader(s);
-  renderBasic(s);
-  renderInvestor(s);
-  renderDaily(s);
-});
-
-// ── 헤더 ────────────────────────────────────────────────────────
-function renderHeader(s) {
-  const rc = cls(s.rate), rbc = bcls(s.rate);
-  $('h-name').textContent  = s.name;
-  $('h-meta').textContent  = `${s.code} · ${s.market} · ${s.dept || '-'}`;
-  $('h-close').textContent = (s.close || 0).toLocaleString();
-  $('h-close').className   = 'hdr-close ' + rc;
-  $('h-rate').textContent  = `${s.rate > 0 ? '+' : ''}${s.rate}% (${s.diff > 0 ? '+' : ''}${(s.diff || 0).toLocaleString()})`;
-  $('h-rate').className    = `hdr-rate ${rbc} ${rc}`;
-
-  const mTag = s.market === 'KOSPI' ? 't-kospi' : s.market === 'KOSDAQ' ? 't-kosdaq' : 't-other';
-  $('tag-banner').innerHTML =
-    `<span class="tag ${mTag}">${s.market}</span>` +
-    (s.isAllH ? '<span class="tag t-allh">역대신고가 🔥</span>' : '') +
-    (s.is52h  ? '<span class="tag t-52h">52주신고가 ★</span>' : '') +
-    (s.dept   ? `<span class="tag" style="background:rgba(58,79,106,.2);color:var(--dim)">${s.dept}</span>` : '');
+    ${rows}
+  </div>`;
 }
 
-// ── 기본 지표 ───────────────────────────────────────────────────
-function renderBasic(s) {
-  $('i-cap').textContent = Math.round(s.cap / 1e8).toLocaleString() + '억';
-  $('i-Q').textContent   = s.Q.toFixed(5);
-  // P는 ×100 적용된 % 단위
-  $('i-P').textContent   = s.P.toFixed(2) + '%';
-  $('i-vol').textContent = (s.volume || 0).toLocaleString();
-
-  const vr  = s.volRatio  || 0;
-  const avg = s.volAvg22  || 0;
-
-  $('i-avg-vol').textContent   = avg > 0 ? avg.toLocaleString() : '—';
-  $('i-vol-ratio').textContent = vr > 0 ? vr.toFixed(0) + '%' : '—';
-
-  const ratioEl = $('i-vol-ratio');
-  if (vr >= 300)      { ratioEl.style.color = '#b464ff'; }
-  else if (vr >= 150) { ratioEl.style.color = 'var(--orange)'; }
-  else                { ratioEl.style.color = 'var(--dim)'; }
-
-  // 거래량 바
-  if (avg > 0) {
-    $('vol-bar-section').style.display = 'block';
-    const pct   = Math.min(vr / 500 * 100, 100);
-    const color = vr >= 300 ? '#b464ff' : vr >= 150 ? 'var(--orange)' : 'var(--dim)';
-    $('vol-ratio-label').textContent   = vr.toFixed(0) + '%';
-    $('vol-ratio-label').style.color   = color;
-    $('vol-bar-fill').style.width      = pct + '%';
-    $('vol-bar-fill').style.background = color;
-  }
+function miniBar(val,max) {
+  if (val===null||val===undefined) return `<div class="bar-w"><span class="bnum tv-n">—</span></div>`;
+  const abs=Math.abs(val), w=Math.max(Math.round(abs/max*42),2);
+  const bc=val>0?'b-up':val<0?'b-dn':'b-0';
+  const vc=val>0?'tv-b':val<0?'tv-s':'tv-n';
+  return `<div class="bar-w"><div class="bar ${bc}" style="width:${w}px"></div><span class="bnum ${vc}">${val>0?'+':''}${fmt억(val)}</span></div>`;
 }
 
-// ── 투자자 요약 테이블 ─────────────────────────────────────────
-function renderInvestor(s) {
-  const inv = s.inv;
-  if (!inv) {
-    $('inv-body').innerHTML = '<div style="text-align:center;padding:16px;font-size:11px;color:var(--muted);font-family:var(--mono)">수급 데이터 없음<br><span style="font-size:10px;color:var(--muted)">Actions 재실행 후 확인하세요</span></div>';
-    return;
-  }
-
-  const rows = [
-    ['외국인',   'frgn'],
-    ['기관합계', 'inst'],
-    ['사모펀드', 'priv'],
-  ].map(([label, key]) => {
-    const cells = ['today','week','month'].map(period => {
-      const v = inv[period]?.[key] ?? null;
-      const vc = v === null ? 'tv-n' : v > 0 ? 'tv-b' : v < 0 ? 'tv-s' : 'tv-n';
-      const str = v === null ? '—' : (v > 0 ? '+' : '') + fmt억(v);
-      return `<div class="inv-td"><span class="${vc}">${str}</span></div>`;
-    }).join('');
-    return `<div class="inv-tr"><div class="inv-td">${label}</div>${cells}</div>`;
-  }).join('');
-
-  $('inv-body').innerHTML = rows;
-}
-
-// ── 15일 일별 테이블 ────────────────────────────────────────────
-function renderDaily(s) {
-  const daily = s.inv?.daily;
-  if (!daily || !daily.length) {
-    $('day-body').innerHTML = '<div style="text-align:center;padding:16px;font-size:11px;color:var(--muted);font-family:var(--mono)">데이터 없음</div>';
-    return;
-  }
-
-  // 바 차트 최대값
-  const vals = daily.flatMap(r => [Math.abs(r.frgn||0), Math.abs(r.inst||0), Math.abs(r.priv||0)]);
-  const maxV  = Math.max(...vals, 1);
-
-  // 거래량 평균 (오늘 제외한 daily 기준)
-  const volAvg = s.volAvg22 || 0;
-
-  const rows = daily.map(r => {
-    const dt    = r.date || '';
-    const dtFmt = dt.length >= 8 ? `${dt.slice(4,6)}/${dt.slice(6,8)}` : '—';
-    const rc    = cls(r.rate || 0);
-    const vol   = r.volume || 0;
-
-    // 거래량 색상: 평균 대비
-    let volStr = vol > 0 ? (vol >= 1e4 ? (vol/1e4).toFixed(0)+'만' : vol.toLocaleString()) : '—';
-    let volColor = 'var(--dim)';
-    if (volAvg > 0 && vol > 0) {
-      const ratio = vol / volAvg * 100;
-      if (ratio >= 300)      volColor = '#b464ff';
-      else if (ratio >= 150) volColor = 'var(--orange)';
-      else                   volColor = 'var(--dim)';
-      volStr = `<span style="color:${volColor};font-weight:600">${volStr}</span>`;
-    }
-
-    return `<div class="day-row">
-      <div class="day-td">${dtFmt}</div>
-      <div class="day-td"><span class="${rc}">${(r.close||0).toLocaleString()}</span></div>
-      <div class="day-td">${volStr}</div>
-      <div class="day-td">${miniBar(r.frgn, maxV)}</div>
-      <div class="day-td">${miniBar(r.inst, maxV)}</div>
-      <div class="day-td">${miniBar(r.priv, maxV)}</div>
-    </div>`;
-  }).join('');
-
-  $('day-body').innerHTML = rows;
-}
-
-function miniBar(val, max) {
-  if (val === null || val === undefined)
-    return `<div class="bar-w"><span class="bnum tv-n">—</span></div>`;
-  const abs  = Math.abs(val);
-  const w    = Math.max(Math.round((abs / max) * 42), 2);
-  const bc   = val > 0 ? 'b-up' : val < 0 ? 'b-dn' : 'b-0';
-  const vc   = val > 0 ? 'tv-b' : val < 0 ? 'tv-s' : 'tv-n';
-  const str  = fmt억(val);
-  const pre  = val > 0 ? '+' : '';
-  return `<div class="bar-w"><div class="bar ${bc}" style="width:${w}px"></div><span class="bnum ${vc}">${pre}${str}</span></div>`;
-}
-
-// ── 유틸 ────────────────────────────────────────────────────────
-const $ = id => document.getElementById(id);
-const cls  = v => v > 0 ? 'up'  : v < 0 ? 'down'  : 'flat';
-const bcls = v => v > 0 ? 'bup' : v < 0 ? 'bdown' : 'bflat';
-
+const cls  = v => v>0?'up':v<0?'down':'flat';
+const bcls = v => v>0?'bup':v<0?'bdown':'bflat';
 function fmt억(v) {
-  if (v === null || v === undefined) return '—';
-  const a = Math.abs(v), pre = v < 0 ? '-' : '';
-  if (a >= 1e12) return pre + (a/1e12).toFixed(1) + '조';
-  if (a >= 1e8)  return pre + (a/1e8).toFixed(1)  + '억';
-  if (a >= 1e4)  return pre + (a/1e4).toFixed(0)  + '만';
+  if(v===null||v===undefined)return'—';
+  const a=Math.abs(v),pre=v<0?'-':'';
+  if(a>=1e12)return pre+(a/1e12).toFixed(1)+'조';
+  if(a>=1e8) return pre+(a/1e8).toFixed(1)+'억';
+  if(a>=1e4) return pre+(a/1e4).toFixed(0)+'만';
   return v.toLocaleString();
+}
+function formatDate(d) {
+  return d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2);
 }
 </script>
 </body>
