@@ -148,7 +148,7 @@ header{position:sticky;top:0;z-index:200;background:rgba(7,10,15,.97);backdrop-f
   <div class="f-ttl">시장구분</div>
   <div class="chips" id="c-mkt"><div class="chip blue on" data-v="ALL">전체</div><div class="chip blue" data-v="KOSPI">KOSPI</div><div class="chip blue" data-v="KOSDAQ">KOSDAQ</div></div>
   <div class="f-ttl">시가총액</div>
-  <div class="chips" id="c-cap"><div class="chip on" data-v="0">전체</div><div class="chip" data-v="100000000000">1천억↑</div><div class="chip" data-v="500000000000">5천억↑</div><div class="chip" data-v="1000000000000">1조↑</div></div>
+  <div class="chips" id="c-cap"><div class="chip on" data-v="0">전체</div><div class="chip" data-v="100000000000">1천억↑</div><div class="chip" data-v="500000000000">5천억↑</div><div class="chip" data-v="1000000000000">1조↑</div><div class="chip" data-v="2000000000000">2조↑</div><div class="chip" data-v="3000000000000">3조↑</div><div class="chip" data-v="4000000000000">4조↑</div></div>
   <div class="f-ttl">등락률</div>
   <div class="chips" id="c-rate"><div class="chip on" data-v="all">전체</div><div class="chip" data-v="up01">+0.1%↑</div><div class="chip" data-v="up">상승</div><div class="chip" data-v="dn">하락</div></div>
   <div class="f-ttl">신고가</div>
@@ -179,7 +179,7 @@ header{position:sticky;top:0;z-index:200;background:rgba(7,10,15,.97);backdrop-f
   <div class="bb-r">
     <button class="bb-btn act" onclick="loadEnriched()">수급 불러오기</button>
     <button class="bb-btn" onclick="resetAll()">필터초기화</button>
-    <button class="bb-btn" onclick="reUpload()">재업로드</button>
+    <button class="bb-btn" id="detach-btn" onclick="detachExcel()" style="display:none;color:var(--warn);border-color:rgba(255,87,87,.3)">엑셀 장착해제</button>
   </div>
 </div>
 <script>
@@ -193,10 +193,28 @@ let hasVol=false,hasPQ=false,enriched={},enrichedLoaded=false;
 
 document.addEventListener('DOMContentLoaded',()=>{
   setupUpload();setupFilters();
-  // Actions 링크 설정
   $('actions-link').href=`https://github.com/${GH_OWNER}/${GH_REPO}/actions`;
-  // 이미 enriched.json 있으면 바로 로드
-  tryFetchEnriched(false);
+  // localStorage에서 엑셀 데이터 복원
+  const saved = localStorage.getItem('krx_excel');
+  const savedMeta = localStorage.getItem('krx_excel_meta');
+  if(saved){
+    try{
+      allData = JSON.parse(saved);
+      const meta = savedMeta ? JSON.parse(savedMeta) : {};
+      hasVol = meta.hasVol||false;
+      hasPQ  = meta.hasPQ ||false;
+      $('hdr-date').textContent = meta.date||'—';
+      $('upload-section').style.display='none';
+      $('detach-btn').style.display='';
+      setStep(1,'done','엑셀 업로드 완료');
+      setStep(2,'wait','Actions 실행 필요');
+      $('action-banner').style.display='block';
+      processUI();
+      tryFetchEnriched(false);
+    }catch(e){ localStorage.removeItem('krx_excel'); localStorage.removeItem('krx_excel_meta'); }
+  } else {
+    tryFetchEnriched(false);
+  }
 });
 
 // ── 진행 상태 ────────────────────────────────────────────────────
@@ -229,13 +247,19 @@ async function handleFile(file){
       allData=parseRows(raw);
       if(!allData.length)throw new Error('유효한 종목 데이터가 없습니다.');
       const m=file.name.match(/(\d{8})/);
-      $('hdr-date').textContent=m?`${m[1].slice(0,4)}.${m[1].slice(4,6)}.${m[1].slice(6,8)}`:file.name;
+      const dateLabel=m?`${m[1].slice(0,4)}.${m[1].slice(4,6)}.${m[1].slice(6,8)}`:file.name;
+      $('hdr-date').textContent=dateLabel;
+      // localStorage에 저장 (새로고침 유지)
+      try{
+        localStorage.setItem('krx_excel', JSON.stringify(allData));
+        localStorage.setItem('krx_excel_meta', JSON.stringify({hasVol,hasPQ,date:dateLabel,filename:file.name}));
+      }catch(e){ console.warn('localStorage 저장 실패 (용량 초과 가능):', e); }
       $('loading').style.display='none';$('upload-section').style.display='none';
+      $('detach-btn').style.display='';
       setStep(1,'done','엑셀 업로드 완료');
       setStep(2,'wait','Actions 실행 필요');
       $('action-banner').style.display='block';
       processUI();
-      // enriched.json 이미 있으면 바로 병합
       await tryFetchEnriched(true);
     }catch(err){$('loading').style.display='none';setStep(1,'','');alert('❌ '+err.message);}
   };
@@ -412,9 +436,13 @@ function resetAll(){
   const def=hasPQ?'P':'rate';document.querySelectorAll('#c-sort [data-v]').forEach(c=>c.classList.toggle('on',c.dataset.v===def));
   $('sort-dir').textContent='↓';render();
 }
-function reUpload(){
+function detachExcel(){
+  if(!confirm('엑셀 데이터를 장착 해제하시겠습니까?\n필터/수급 데이터가 모두 초기화됩니다.')) return;
+  localStorage.removeItem('krx_excel');
+  localStorage.removeItem('krx_excel_meta');
   allData=[];hasVol=false;hasPQ=false;enriched={};enrichedLoaded=false;
   $('upload-section').style.display='block';$('action-banner').style.display='none';
+  $('detach-btn').style.display='none';
   ['summary','filter-panel','bot-bar'].forEach(id=>$(id).style.display='none');
   $('result-row').style.display='none';$('stock-list').innerHTML='';$('file-badge').style.display='none';$('hdr-date').textContent='—';
   [1,2,3].forEach(n=>setStep(n,'',''));
