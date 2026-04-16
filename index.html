@@ -105,6 +105,24 @@ header{position:sticky;top:0;z-index:200;background:rgba(7,10,15,.97);backdrop-f
 .bb-r{display:flex;gap:6px}
 .bb-btn{font-size:10px;color:var(--muted);font-family:var(--mono);background:none;border:1px solid var(--border);border-radius:5px;padding:4px 9px;cursor:pointer}
 .bb-btn.act{color:var(--orange);border-color:rgba(255,149,0,.4)}
+
+/* 거래주체 랭킹 */
+#ranking-section{display:none;padding:0 16px 10px}
+.rank-tabs{display:flex;gap:6px;margin-bottom:10px;overflow-x:auto}
+.rtab{padding:6px 14px;border-radius:16px;border:1px solid var(--border);background:var(--s1);font-size:11px;color:var(--dim);font-family:var(--mono);cursor:pointer;white-space:nowrap;flex-shrink:0}
+.rtab.on{border-color:var(--blue);background:rgba(26,143,255,.12);color:var(--blue)}
+.rank-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rank-col{background:var(--s1);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.rank-col-hdr{padding:7px 10px;font-size:10px;font-family:var(--mono);font-weight:600;border-bottom:1px solid var(--border)}
+.rank-col-hdr.buy{background:rgba(0,214,143,.08);color:var(--accent)}
+.rank-col-hdr.sell{background:rgba(255,68,102,.08);color:var(--down)}
+.rank-row{display:flex;align-items:center;padding:5px 8px;border-bottom:1px solid rgba(26,37,53,.8);gap:5px}
+.rank-row:last-child{border-bottom:none}
+.rank-n{font-size:9px;color:var(--muted);font-family:var(--mono);min-width:16px}
+.rank-name{font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rank-amt{font-size:10px;font-family:var(--mono);font-weight:600;white-space:nowrap}
+.rank-pct{font-size:9px;color:var(--muted);font-family:var(--mono);white-space:nowrap;margin-left:2px}
+.rank-buy{color:var(--up)}.rank-sell{color:var(--down)}
 </style>
 </head>
 <body>
@@ -136,6 +154,25 @@ header{position:sticky;top:0;z-index:200;background:rgba(7,10,15,.97);backdrop-f
   <div class="ab-step">1. 아래 버튼 → <b>KIS 수급 데이터 수집</b> → <b>Run workflow</b></div>
   <div class="ab-step">2. 완료 후 (약 10~15분) 아래 <b>수급 불러오기</b> 버튼 클릭</div>
   <a class="ab-btn" id="actions-link" href="#" target="_blank">GitHub Actions 열기 →</a>
+</div>
+
+<!-- 거래주체별 랭킹 -->
+<div id="ranking-section">
+  <div class="rank-tabs" id="rank-tabs">
+    <div class="rtab on" data-v="frgn">외국인</div>
+    <div class="rtab" data-v="inst">기관합계</div>
+    <div class="rtab" data-v="priv">사모펀드</div>
+  </div>
+  <div class="rank-grid">
+    <div class="rank-col">
+      <div class="rank-col-hdr buy" id="rank-buy-hdr">▲ 순매수 TOP20</div>
+      <div id="rank-buy-list"></div>
+    </div>
+    <div class="rank-col">
+      <div class="rank-col-hdr sell" id="rank-sell-hdr">▽ 순매도 TOP20</div>
+      <div id="rank-sell-list"></div>
+    </div>
+  </div>
 </div>
 <div id="summary"><div class="sum-grid">
   <div class="sum-card"><div class="s-lbl">TOTAL</div><div class="s-val" id="s-tot">—</div></div>
@@ -284,6 +321,7 @@ async function tryFetchEnriched(showResult=false){
     // 추가 정렬 버튼 표시
     $('s-frgn').style.display='';$('s-inst').style.display='';
     $('frgn-ttl').style.display='block';$('c-frgn').style.display='flex';
+    if(j.ranking) renderRanking(j.ranking);
     if(allData.length)render();
     return true;
   }catch{return false;}
@@ -445,6 +483,45 @@ function detachExcel(){
   ['summary','filter-panel','bot-bar'].forEach(id=>$(id).style.display='none');
   $('result-row').style.display='none';$('stock-list').innerHTML='';$('file-badge').style.display='none';$('hdr-date').textContent='—';
   [1,2,3].forEach(n=>setStep(n,'',''));
+}
+
+// ── 거래주체 랭킹 ─────────────────────────────────────────────
+let rankingData={}, curRankKey='frgn';
+
+function renderRanking(ranking){
+  rankingData=ranking;
+  $('ranking-section').style.display='block';
+  showRank('frgn');
+  document.getElementById('rank-tabs').addEventListener('click',e=>{
+    const t=e.target.closest('[data-v]');if(!t)return;
+    document.querySelectorAll('.rtab').forEach(x=>x.classList.remove('on'));
+    t.classList.add('on');
+    showRank(t.dataset.v);
+  });
+}
+
+function showRank(key){
+  curRankKey=key;
+  const labels={'frgn':'외국인','inst':'기관합계','priv':'사모펀드'};
+  $('rank-buy-hdr').textContent =`▲ ${labels[key]} 순매수 TOP20`;
+  $('rank-sell-hdr').textContent=`▽ ${labels[key]} 순매도 TOP20`;
+  $('rank-buy-list').innerHTML  = rankRows(rankingData[key+'_buy'],  true);
+  $('rank-sell-list').innerHTML = rankRows(rankingData[key+'_sell'], false);
+}
+
+function rankRows(list, isBuy){
+  if(!list||!list.length) return '<div style="padding:10px;text-align:center;font-size:10px;color:var(--muted)">데이터 없음</div>';
+  return list.map((r,i)=>{
+    const cls=isBuy?'rank-buy':'rank-sell';
+    const sign=isBuy?'+':'-';
+    const mk=r.market==='KOSPI'?'K':'Q';
+    return `<div class="rank-row" onclick="goDetail('${r.code}')">
+      <span class="rank-n">${i+1}</span>
+      <span class="rank-name">${r.name}<span style="font-size:9px;color:var(--muted);margin-left:3px">[${mk}]</span></span>
+      <span class="rank-amt ${cls}">${sign}${fmt억(Math.abs(r.amt))}</span>
+      <span class="rank-pct">${r.pct.toFixed(2)}%</span>
+    </div>`;
+  }).join('');
 }
 const $=id=>document.getElementById(id);
 const cls=v=>v>0?'up':v<0?'down':'flat';
