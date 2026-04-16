@@ -4492,7 +4492,7 @@ def main():
             price = fetch_price(token, code);    time.sleep(DELAY)
             inv   = fetch_investor(token, code); time.sleep(DELAY)
 
-                    result[code] = clean({
+            result[code] = clean({
                 "name":     name,
                 "market":   mkt,
                 "cap":      cap,
