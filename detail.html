@@ -6,378 +6,253 @@
 <title>종목 상세</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
-:root{
-  --bg:#070a0f;--s1:#0d1117;--s2:#131a24;--border:#1a2535;
-  --accent:#00d68f;--blue:#1a8fff;--warn:#ff5757;--orange:#ff9500;--purple:#b464ff;
-  --text:#dde4f0;--muted:#3a4f6a;--dim:#7a90aa;--up:#00d68f;--down:#ff4466;
-  --mono:'IBM Plex Mono',monospace;--sans:'Noto Sans KR',sans-serif;
-}
+:root{--bg:#070a0f;--s1:#0d1117;--s2:#131a24;--border:#1a2535;--accent:#00d68f;--blue:#1a8fff;--warn:#ff5757;--orange:#ff9500;--purple:#b464ff;--text:#dde4f0;--muted:#3a4f6a;--dim:#7a90aa;--up:#00d68f;--down:#ff4466;--mono:'IBM Plex Mono',monospace;--sans:'Noto Sans KR',sans-serif}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh}
 
-header{position:sticky;top:0;z-index:100;background:rgba(7,10,15,.97);
-  backdrop-filter:blur(16px);border-bottom:1px solid var(--border);
-  padding:11px 16px;display:flex;align-items:center;gap:10px}
-.back{background:none;border:1px solid var(--border);border-radius:7px;
-  color:var(--dim);font-size:13px;padding:5px 10px;cursor:pointer;font-family:var(--mono)}
-.hdr-info{flex:1}
-.hdr-name{font-size:15px;font-weight:600}
-.hdr-meta{font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:1px}
-.hdr-pr{text-align:right}
-.hdr-close{font-size:16px;font-weight:700;font-family:var(--mono)}
-.hdr-rate{font-size:11px;font-family:var(--mono);font-weight:600;
-  padding:2px 7px;border-radius:4px;margin-top:2px;display:inline-block}
+/* 헤더 */
+header{background:rgba(7,10,15,.97);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100}
+.back{background:none;border:1px solid var(--border);border-radius:7px;color:var(--dim);font-size:12px;padding:5px 10px;cursor:pointer;font-family:var(--mono);white-space:nowrap}
+.hdr-main{flex:1;min-width:0}
+.hdr-name{font-size:16px;font-weight:700}
+.hdr-sub{font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:2px}
+.hdr-price{text-align:right;flex-shrink:0}
+.hdr-close{font-size:18px;font-weight:700;font-family:var(--mono)}
+.hdr-rate{font-size:11px;font-family:var(--mono);font-weight:600;padding:2px 7px;border-radius:4px;margin-top:3px;display:inline-block}
 
-.tag-banner{padding:8px 16px;display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+/* 태그 */
+.tag-row{padding:8px 16px;display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--border)}
 .tag{font-size:10px;font-family:var(--mono);padding:3px 9px;border-radius:4px}
 .t-kospi{background:rgba(26,143,255,.15);color:var(--blue)}
 .t-kosdaq{background:rgba(0,214,143,.12);color:var(--accent)}
 .t-other{background:rgba(58,79,106,.2);color:var(--dim)}
 .t-52h{background:rgba(255,149,0,.15);color:var(--orange);border:1px solid rgba(255,149,0,.3)}
-.t-allh{background:rgba(255,87,87,.15);color:var(--warn);border:1px solid rgba(255,87,87,.3);animation:glow .9s alternate infinite}
-@keyframes glow{to{box-shadow:0 0 6px rgba(255,87,87,.35)}}
+.t-allh{background:rgba(255,87,87,.15);color:var(--warn);border:1px solid rgba(255,87,87,.3)}
 
 .content{padding:14px 16px 80px}
 
-.sec-hdr{font-size:10px;color:var(--muted);font-family:var(--mono);
-  letter-spacing:.1em;text-transform:uppercase;margin:18px 0 9px;
-  display:flex;align-items:center;gap:7px}
-.sec-hdr::after{content:'';flex:1;height:1px;background:var(--border)}
+/* 섹션 헤더 */
+.sec{font-size:10px;color:var(--muted);font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;margin:18px 0 9px;display:flex;align-items:center;gap:7px}
+.sec::after{content:'';flex:1;height:1px;background:var(--border)}
 
-/* 기본 지표 */
+/* 기본지표 그리드 */
 .info-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
-.ic{background:var(--s1);border:1px solid var(--border);border-radius:8px;padding:9px 10px;text-align:center}
-.ic-lbl{font-size:9px;color:var(--muted);font-family:var(--mono);margin-bottom:3px}
+.ic{background:var(--s1);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center}
+.ic-lbl{font-size:9px;color:var(--muted);font-family:var(--mono);margin-bottom:4px}
 .ic-val{font-size:13px;font-weight:600;font-family:var(--mono)}
 
-/* 거래량 바 */
-#vol-bar-wrap{display:none;background:var(--s1);border:1px solid var(--border);
-  border-radius:8px;padding:12px 14px;margin-top:6px}
-.vb-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-.vb-lbl{font-size:9px;color:var(--muted);font-family:var(--mono)}
-.vb-val{font-size:14px;font-weight:700;font-family:var(--mono)}
-.vb-track{background:var(--border);border-radius:4px;height:8px;overflow:hidden;margin-bottom:4px}
-.vb-fill{height:100%;border-radius:4px;transition:width .5s}
-.vb-scale{display:flex;justify-content:space-between}
-.vb-scale span{font-size:9px;color:var(--muted);font-family:var(--mono)}
-
-/* 투자자 테이블 */
-.inv-tbl{background:var(--s1);border:1px solid var(--border);border-radius:10px;overflow:hidden}
-.inv-head{display:grid;grid-template-columns:72px repeat(3,1fr);
-  background:var(--s2);padding:7px 10px;border-bottom:1px solid var(--border)}
-.inv-th{font-size:9px;color:var(--muted);font-family:var(--mono);text-align:center}
-.inv-th:first-child{text-align:left}
-.inv-tr{display:grid;grid-template-columns:72px repeat(3,1fr);
-  padding:8px 10px;border-bottom:1px solid var(--border)}
-.inv-tr:last-child{border-bottom:none}
-.inv-td{font-size:11px;font-family:var(--mono);text-align:center;display:flex;align-items:center;justify-content:center}
-.inv-td:first-child{color:var(--dim);font-size:10px;justify-content:flex-start}
-.tv-b{color:var(--up);font-weight:600}.tv-s{color:var(--down);font-weight:600}.tv-n{color:var(--dim)}
-
-/* 15일 테이블 */
-.day-tbl{background:var(--s1);border:1px solid var(--border);border-radius:10px;overflow:hidden}
-.day-head{display:grid;grid-template-columns:46px 56px 56px 1fr 1fr 1fr;
-  background:var(--s2);padding:7px 8px;border-bottom:1px solid var(--border)}
-.day-th{font-size:9px;color:var(--muted);font-family:var(--mono);text-align:center}
-.day-th:first-child{text-align:left}
-.day-row{display:grid;grid-template-columns:46px 56px 56px 1fr 1fr 1fr;
-  padding:6px 8px;border-bottom:1px solid var(--border);align-items:center}
-.day-row:last-child{border-bottom:none}
-.day-td{font-size:10px;font-family:var(--mono);text-align:center}
-.day-td:first-child{text-align:left;color:var(--dim)}
-
-.bar-w{display:flex;align-items:center;gap:3px;justify-content:center}
-.bar{height:10px;border-radius:2px;min-width:2px}
-.b-up{background:rgba(0,214,143,.55)}.b-dn{background:rgba(255,68,102,.55)}.b-0{background:var(--border)}
-.bnum{font-size:8px;font-family:var(--mono);min-width:26px;text-align:left}
-
-/* 로딩/없음 */
-.no-kis{background:rgba(255,149,0,.08);border:1px solid rgba(255,149,0,.2);border-radius:8px;
-  padding:12px;text-align:center;font-size:11px;color:var(--orange);font-family:var(--mono);line-height:1.7}
-.sec-spin{text-align:center;padding:20px;font-size:11px;color:var(--muted);font-family:var(--mono)}
-.spin-sm{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);
-  border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 6px}
-@keyframes spin{to{transform:rotate(360deg)}}
-
+/* 투자자 수급 요약 (마켓레이더 이미지3 스타일) */
+.supply-wrap{background:var(--s1);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.supply-row{display:grid;grid-template-columns:50px 1fr 1fr 1fr;padding:8px 12px;border-bottom:1px solid var(--border);align-items:center;gap:6px}
+.supply-row:last-child{border-bottom:none}
+.supply-period{font-size:10px;color:var(--muted);font-family:var(--mono)}
+.supply-val{font-size:12px;font-family:var(--mono);font-weight:600;text-align:right}
+.supply-hdr{background:var(--s2);padding:6px 12px}
+.supply-hdr .supply-period{color:var(--dim)}
+.supply-hdr .supply-val{font-size:9px;color:var(--dim);font-weight:400}
 .up{color:var(--up)}.down{color:var(--down)}.flat{color:var(--dim)}
 .bup{background:rgba(0,214,143,.12)}.bdown{background:rgba(255,68,102,.12)}.bflat{background:rgba(58,79,106,.2)}
+
+/* 종목 정보 */
+.info-list{background:var(--s1);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border-bottom:1px solid var(--border)}
+.info-row:last-child{border-bottom:none}
+.info-key{font-size:11px;color:var(--muted)}
+.info-val{font-size:11px;font-family:var(--mono);font-weight:500;text-align:right}
+
+/* 일별 수급 테이블 */
+.daily-tbl{background:var(--s1);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.dt-hdr{display:grid;grid-template-columns:46px 54px 70px 70px 70px 54px;padding:7px 8px;background:var(--s2);border-bottom:1px solid var(--border)}
+.dt-th{font-size:9px;color:var(--muted);font-family:var(--mono);text-align:center}
+.dt-th:first-child{text-align:left}
+.dt-row{display:grid;grid-template-columns:46px 54px 70px 70px 70px 54px;padding:6px 8px;border-bottom:1px solid rgba(26,37,53,.7);align-items:center}
+.dt-row:last-child{border-bottom:none}
+.dt-td{font-size:10px;font-family:var(--mono);text-align:center}
+.dt-td:first-child{text-align:left;color:var(--dim)}
+
+/* Phase 뱃지 */
+.phase-badge{display:inline-block;font-size:9px;font-family:var(--mono);padding:2px 7px;border-radius:3px;font-weight:600}
+.ph-golden{background:rgba(255,200,0,.15);color:#ffc800;border:1px solid rgba(255,200,0,.3)}
+.ph-p2{background:rgba(0,214,143,.12);color:var(--accent);border:1px solid rgba(0,214,143,.25)}
+.ph-p1{background:rgba(26,143,255,.12);color:var(--blue);border:1px solid rgba(26,143,255,.25)}
+.ph-p3{background:rgba(255,68,102,.12);color:var(--down);border:1px solid rgba(255,68,102,.25)}
+.ph-{background:rgba(58,79,106,.15);color:var(--dim)}
 </style>
 </head>
 <body>
-
 <header>
   <button class="back" onclick="history.back()">← 목록</button>
-  <div class="hdr-info">
+  <div class="hdr-main">
     <div class="hdr-name" id="h-name">—</div>
-    <div class="hdr-meta" id="h-meta">—</div>
+    <div class="hdr-sub" id="h-sub">—</div>
   </div>
-  <div class="hdr-pr">
+  <div class="hdr-price">
     <div class="hdr-close" id="h-close">—</div>
     <span class="hdr-rate" id="h-rate">—</span>
   </div>
 </header>
-
-<div class="tag-banner" id="tag-banner"></div>
+<div class="tag-row" id="tag-banner"></div>
 
 <div class="content">
 
-  <div class="sec-hdr">기본 지표</div>
+  <div class="sec">기본 지표</div>
   <div class="info-grid" id="basic-grid"></div>
-  <div id="vol-bar-wrap">
-    <div class="vb-top">
-      <span class="vb-lbl">거래량 vs 22일 평균</span>
-      <span class="vb-val" id="vb-val">—</span>
+
+  <div class="sec">투자자별 수급  <span style="font-size:9px;color:var(--muted);font-family:var(--mono)">(외국인 · 기관합계 · 개인)</span></div>
+  <div class="supply-wrap">
+    <div class="supply-row supply-hdr">
+      <div class="supply-period"></div>
+      <div class="supply-val">외국인</div>
+      <div class="supply-val">기관합계</div>
+      <div class="supply-val">개인</div>
     </div>
-    <div class="vb-track"><div class="vb-fill" id="vb-fill" style="width:0%"></div></div>
-    <div class="vb-scale"><span>0%</span><span>100%(평균)</span><span>500%+</span></div>
+    <div class="supply-row" id="sup-today"><div class="supply-period">오늘</div></div>
+    <div class="supply-row" id="sup-week"><div class="supply-period">1주일</div></div>
+    <div class="supply-row" id="sup-month"><div class="supply-period">1개월</div></div>
   </div>
 
-  <div class="sec-hdr">외국인 · 기관 · 사모펀드 매매동향</div>
-  <div id="inv-section">
-    <div class="sec-spin"><div class="spin-sm"></div>KIS API 조회 중...</div>
-  </div>
+  <div class="sec">종목 정보</div>
+  <div class="info-list" id="info-list"></div>
 
-  <div class="sec-hdr">15일 일별 시세 & 투자자 거래대금</div>
-  <div id="daily-section">
-    <div class="sec-spin"><div class="spin-sm"></div>조회 중...</div>
+  <div class="sec">일별 수급 · 매직지수 <span style="font-size:9px;color:var(--muted);font-family:var(--mono)">(최근 15일)</span></div>
+  <div class="daily-tbl">
+    <div class="dt-hdr">
+      <div class="dt-th">날짜</div>
+      <div class="dt-th">종가</div>
+      <div class="dt-th">외국인</div>
+      <div class="dt-th">기관합계</div>
+      <div class="dt-th">개인</div>
+      <div class="dt-th">Phase</div>
+    </div>
+    <div id="daily-body"></div>
   </div>
 
 </div>
 
 <script>
 const $ = id => document.getElementById(id);
-const KIS = 'https://openapi.koreainvestment.com:9443';
 let s = null;
 
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
   const raw = sessionStorage.getItem('detail_stock');
   if (!raw) { history.back(); return; }
   s = JSON.parse(raw);
-
-  const kisToken  = sessionStorage.getItem('kis_token')  || '';
-  const kisKey    = sessionStorage.getItem('kis_key')    || '';
-  const kisSecret = sessionStorage.getItem('kis_secret') || '';
-
   renderHeader();
   renderBasic();
-
-  if (!kisToken) {
-    $('inv-section').innerHTML  = '<div class="no-kis">KIS API 미연결<br>목록 화면에서 KIS API 연결 후 다시 열어주세요</div>';
-    $('daily-section').innerHTML = '<div class="no-kis">KIS API 미연결</div>';
-    return;
-  }
-
-  const hdr = trId => ({
-    'authorization':'Bearer '+kisToken, 'appkey':kisKey, 'appsecret':kisSecret,
-    'tr_id':trId, 'Content-Type':'application/json'
-  });
-
-  // 이미 로드된 데이터 있으면 바로 표시
-  if (s._inv) {
-    renderInvestor(s._inv);
-    renderDaily(s._inv.daily);
-  } else {
-    // KIS API 실시간 조회
-    await loadKIS(hdr);
-  }
+  renderSupply();
+  renderInfo();
+  renderDaily();
 });
 
 function renderHeader() {
-  const rc=cls(s.rate), rbc=bcls(s.rate);
-  $('h-name').textContent = s.name;
-  $('h-meta').textContent = `${s.code} · ${s.market} · ${s.dept||'-'}`;
+  const rc = cls(s.rate||0), rbc = bcls(s.rate||0);
+  const name = s.name || s.code || '—';
+  const sub = [s.code, s.market, s.dept].filter(Boolean).join(' · ');
+  $('h-name').textContent = name;
+  $('h-sub').textContent  = sub;
   $('h-close').textContent = (s.close||0).toLocaleString();
-  $('h-close').className = 'hdr-close '+rc;
-  $('h-rate').textContent = `${s.rate>0?'+':''}${s.rate}% (${s.diff>0?'+':''}${(s.diff||0).toLocaleString()})`;
-  $('h-rate').className = `hdr-rate ${rbc} ${rc}`;
+  $('h-close').className   = 'hdr-close ' + rc;
+  const sign = (s.rate||0) > 0 ? '+' : '';
+  $('h-rate').textContent  = `${sign}${(s.rate||0).toFixed(2)}% (${(s.diff||0)>0?'+':''}${(s.diff||0).toLocaleString()})`;
+  $('h-rate').className    = `hdr-rate ${rbc} ${rc}`;
+
   const mTag = s.market==='KOSPI'?'t-kospi':s.market==='KOSDAQ'?'t-kosdaq':'t-other';
   $('tag-banner').innerHTML =
-    `<span class="tag ${mTag}">${s.market}</span>`
+    `<span class="tag ${mTag}">${s.market||'—'}</span>`
     +(s.isAllH?'<span class="tag t-allh">역대신고가🔥</span>':'')
     +(s.is52h ?'<span class="tag t-52h">52주신고가★</span>':'')
     +(s.dept  ?`<span class="tag" style="background:rgba(58,79,106,.2);color:var(--dim)">${s.dept}</span>`:'');
 }
 
 function renderBasic() {
-  const capStr = s.cap>0 ? Math.round(s.cap/1e8).toLocaleString()+'억' : '—';
+  const capStr = s.cap > 0 ? Math.round(s.cap/1e8).toLocaleString()+'억' : '—';
   const items = [
     ['시가총액', capStr, ''],
-    ['등락률', (s.rate>0?'+':'')+s.rate+'%', cls(s.rate)],
-    ['종가', (s.close||0).toLocaleString(), cls(s.rate)],
+    ['등락률', (s.rate>0?'+':'')+(s.rate||0).toFixed(2)+'%', cls(s.rate||0)],
+    ['종가', (s.close||0).toLocaleString(), cls(s.rate||0)],
   ];
-  if (s.P !== null) items.push(['P 무게수(%)', s.P.toFixed(2)+'%', 'color:var(--accent)']);
-  if (s.Q !== null) items.push(['Q 대금비중', s.Q.toFixed(5), 'color:var(--blue)']);
-  if (s.volume) items.push(['거래량', s.volume.toLocaleString(), '']);
+  if (s.P != null) items.push(['P 무게수(%)', (s.P||0).toFixed(2)+'%', 'color:var(--accent)']);
+  if (s.Q != null) items.push(['Q 대금비중', (s.Q||0).toFixed(5), 'color:var(--blue)']);
+  if (s.volume)    items.push(['거래량', (s.volume||0).toLocaleString(), '']);
 
   $('basic-grid').innerHTML = items.map(([l,v,c]) =>
-    `<div class="ic"><div class="ic-lbl">${l}</div><div class="ic-val" style="${c.includes('color')?c:''}" class="${c}">${v}</div></div>`
+    `<div class="ic"><div class="ic-lbl">${l}</div><div class="ic-val" class="${c}" style="${c.startsWith('color') ? c : ''}">${v}</div></div>`
   ).join('');
+}
 
-  // 거래량 바
-  const vr = s.volRatio||0, avg = s.volAvg22||0;
-  if (avg>0) {
-    $('vol-bar-wrap').style.display='block';
-    const pct=Math.min(vr/500*100,100);
-    const color=vr>=300?'var(--purple)':vr>=150?'var(--orange)':'var(--dim)';
-    $('vb-val').textContent=vr.toFixed(0)+'%';
-    $('vb-val').style.color=color;
-    $('vb-fill').style.width=pct+'%';
-    $('vb-fill').style.background=color;
+function renderSupply() {
+  const inv = s._inv;
+  if (!inv) {
+    ['sup-today','sup-week','sup-month'].forEach(id => {
+      $(id).innerHTML += '<div class="supply-val flat">—</div><div class="supply-val flat">—</div><div class="supply-val flat">—</div>';
+    });
+    return;
   }
-}
-
-async function loadKIS(hdr) {
-  try {
-    // 투자자 조회
-    const iRes = await fetch(
-      `${KIS}/uapi/domestic-stock/v1/quotations/inquire-investor?FID_COND_MRKT_DIV_CODE=J&FID_INPUT_ISCD=${s.code}`,
-      { headers: hdr('FHKST01010900') }
-    );
-    const ij = await iRes.json();
-
-    if (ij.rt_cd==='0' && ij.output?.length) {
-      const arr = ij.output;
-      const ti = v => parseInt(v||0);
-      const sum = (days,f) => arr.slice(0,days).reduce((a,r)=>a+ti(r[f]),0);
-      const inv = {
-        today: {frgn:ti(arr[0].frgn_ntby_tr_pbmn), inst:ti(arr[0].orgn_ntby_tr_pbmn), priv:ti(arr[0].pvt_fund_ntby_tr_pbmn)},
-        week : {frgn:sum(5,'frgn_ntby_tr_pbmn'),   inst:sum(5,'orgn_ntby_tr_pbmn'),   priv:sum(5,'pvt_fund_ntby_tr_pbmn')},
-        month: {frgn:sum(22,'frgn_ntby_tr_pbmn'),  inst:sum(22,'orgn_ntby_tr_pbmn'),  priv:sum(22,'pvt_fund_ntby_tr_pbmn')},
-        daily: arr.slice(0,15).reverse().map(r=>({
-          date:r.stck_bsop_date, frgn:ti(r.frgn_ntby_tr_pbmn),
-          inst:ti(r.orgn_ntby_tr_pbmn), priv:ti(r.pvt_fund_ntby_tr_pbmn),
-          close:0, rate:0, volume:0,
-        })),
-      };
-
-      // 일별 시세 조회 (종가 + 거래량 병합)
-      await new Promise(r=>setTimeout(r,130));
-      try {
-        const end = formatDate(new Date());
-        const start = formatDate(new Date(Date.now()-35*86400000));
-        const dRes = await fetch(
-          `${KIS}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice?FID_COND_MRKT_DIV_CODE=J&FID_INPUT_ISCD=${s.code}&FID_INPUT_DATE_1=${start}&FID_INPUT_DATE_2=${end}&FID_PERIOD_DIV_CODE=D&FID_ORG_ADJ_PRC=0`,
-          { headers: hdr('FHKST03010100') }
-        );
-        const dj = await dRes.json();
-        if (dj.rt_cd==='0' && dj.output2?.length) {
-          const pm = {};
-          for (const r of dj.output2) {
-            pm[r.stck_bsop_date] = {
-              close: parseInt(r.stck_clpr||0),
-              rate:  parseFloat(r.prdy_ctrt||0),
-              volume:parseInt(r.acml_vol||0),
-            };
-          }
-          for (const row of inv.daily) {
-            const p = pm[row.date]||{};
-            row.close=p.close||0; row.rate=p.rate||0; row.volume=p.volume||0;
-          }
-          // 22일 평균 거래량 (없었으면 보완)
-          if (!s.volAvg22 && dj.output2.length>1) {
-            const vols = dj.output2.slice(1,23).map(r=>parseInt(r.acml_vol||0)).filter(v=>v>0);
-            if (vols.length) {
-              s.volAvg22 = Math.round(vols.reduce((a,b)=>a+b,0)/vols.length);
-              s.volRatio = s.volume ? Math.round(s.volume/s.volAvg22*100*10)/10 : 0;
-              renderBasic(); // 거래량 바 업데이트
-            }
-          }
-        }
-      } catch(e) {}
-
-      renderInvestor(inv);
-      renderDaily(inv.daily);
-    } else {
-      $('inv-section').innerHTML = `<div class="no-kis">수급 데이터 없음 (${ij.msg1||''})</div>`;
-      $('daily-section').innerHTML = '<div class="no-kis">일별 데이터 없음</div>';
-    }
-  } catch(e) {
-    $('inv-section').innerHTML = `<div class="no-kis">조회 실패: ${e.message}</div>`;
-    $('daily-section').innerHTML = '';
+  function fillRow(elId, data) {
+    const el = $(elId);
+    ['frgn','inst','indiv'].forEach(k => {
+      const v = data[k] ?? null;
+      const vc = v === null ? 'flat' : v > 0 ? 'up' : v < 0 ? 'down' : 'flat';
+      el.innerHTML += `<div class="supply-val ${vc}">${v === null ? '—' : (v>0?'+':'')+fmt억(v)}</div>`;
+    });
   }
+  fillRow('sup-today', inv.today || {});
+  fillRow('sup-week',  inv.week  || {});
+  fillRow('sup-month', inv.month || {});
 }
 
-function renderInvestor(inv) {
-  const rows = [['외국인','frgn'],['기관합계','inst'],['사모펀드','priv']].map(([label,key]) => {
-    const cells = ['today','week','month'].map(p => {
-      const v = inv[p]?.[key]??null;
-      const vc = v===null?'tv-n':v>0?'tv-b':v<0?'tv-s':'tv-n';
-      return `<div class="inv-td"><span class="${vc}">${v===null?'—':(v>0?'+':'')+fmt억(v)}</span></div>`;
-    }).join('');
-    return `<div class="inv-tr"><div class="inv-td">${label}</div>${cells}</div>`;
-  }).join('');
+function renderInfo() {
+  const rows = [];
+  if (s.market)   rows.push(['시장',    s.market]);
+  if (s.dept)     rows.push(['업종',    s.dept]);
+  if (s.cap > 0)  rows.push(['시가총액', Math.round(s.cap/1e8).toLocaleString()+'억']);
+  if (s.volume)   rows.push(['거래량',  s.volume.toLocaleString()]);
+  if (s.amount)   rows.push(['거래대금', Math.round((s.amount||0)/1e8).toLocaleString()+'억']);
+  if (s.f_consec > 0) rows.push(['외인 연속매수', s.f_consec+'일']);
+  if (s.i_consec > 0) rows.push(['기관 연속매수', s.i_consec+'일']);
+  if (s.nh_flag)  rows.push(['신고가',  s.nh_flag]);
 
-  $('inv-section').innerHTML = `<div class="inv-tbl">
-    <div class="inv-head">
-      <div class="inv-th">구분</div>
-      <div class="inv-th">당일</div>
-      <div class="inv-th">1주(5일)</div>
-      <div class="inv-th">1달(22일)</div>
-    </div>
-    ${rows}
-  </div>`;
+  if (!rows.length) { $('info-list').style.display='none'; return; }
+  $('info-list').innerHTML = rows.map(([k,v]) =>
+    `<div class="info-row"><span class="info-key">${k}</span><span class="info-val">${v}</span></div>`
+  ).join('');
 }
 
-function renderDaily(daily) {
-  if (!daily?.length) { $('daily-section').innerHTML='<div class="no-kis">데이터 없음</div>'; return; }
-  const vals = daily.flatMap(r=>[Math.abs(r.frgn||0),Math.abs(r.inst||0),Math.abs(r.priv||0)]);
-  const maxV = Math.max(...vals,1);
-  const volAvg = s.volAvg22||0;
-
-  const rows = daily.map(r => {
-    const dt = r.date||'';
-    const dtFmt = dt.length>=8 ? `${dt.slice(4,6)}/${dt.slice(6,8)}` : '—';
+function renderDaily() {
+  const daily = s._inv?.daily;
+  if (!daily?.length) {
+    $('daily-body').innerHTML = '<div style="padding:16px;text-align:center;font-size:11px;color:var(--muted)">일별 데이터 없음</div>';
+    return;
+  }
+  // 마켓레이더 방식: 최신일이 상단 (daily는 이미 오래된→최신 순이므로 reverse)
+  const rows = [...daily].reverse();
+  $('daily-body').innerHTML = rows.map(r => {
+    const dt = r.date || '';
+    const dtFmt = dt.length >= 8 ? dt.slice(4,6)+'/'+dt.slice(6,8) : '—';
+    const phKey = r.phase_key || '';
+    const phLabel = r.phase || '-';
+    const phCls = 'ph-'+phKey;
     const rc = cls(r.rate||0);
-    const vol = r.volume||0;
-    let volStr = vol>0 ? (vol>=1e4?(vol/1e4).toFixed(0)+'만':vol.toLocaleString()) : '—';
-    if (volAvg>0 && vol>0) {
-      const ratio=vol/volAvg*100;
-      const vc=ratio>=300?'var(--purple)':ratio>=150?'var(--orange)':'var(--dim)';
-      volStr=`<span style="color:${vc};font-weight:600">${volStr}</span>`;
-    }
-    return `<div class="day-row">
-      <div class="day-td">${dtFmt}</div>
-      <div class="day-td"><span class="${rc}">${(r.close||0).toLocaleString()}</span></div>
-      <div class="day-td">${volStr}</div>
-      <div class="day-td">${miniBar(r.frgn,maxV)}</div>
-      <div class="day-td">${miniBar(r.inst,maxV)}</div>
-      <div class="day-td">${miniBar(r.priv,maxV)}</div>
+    return `<div class="dt-row">
+      <div class="dt-td">${dtFmt}</div>
+      <div class="dt-td"><span class="${rc}">${(r.close||0).toLocaleString()}</span></div>
+      <div class="dt-td"><span class="${cls(r.frgn||0)}">${r.frgn != null ? (r.frgn>0?'+':'')+fmt억(r.frgn) : '—'}</span></div>
+      <div class="dt-td"><span class="${cls(r.inst||0)}">${r.inst != null ? (r.inst>0?'+':'')+fmt억(r.inst) : '—'}</span></div>
+      <div class="dt-td"><span class="${cls(r.indiv||0)}">${r.indiv != null ? (r.indiv>0?'+':'')+fmt억(r.indiv) : '—'}</span></div>
+      <div class="dt-td"><span class="phase-badge ${phCls}">${phLabel}</span></div>
     </div>`;
   }).join('');
-
-  $('daily-section').innerHTML = `<div class="day-tbl">
-    <div class="day-head">
-      <div class="day-th">날짜</div>
-      <div class="day-th">종가</div>
-      <div class="day-th">거래량</div>
-      <div class="day-th">외국인</div>
-      <div class="day-th">기관합계</div>
-      <div class="day-th">사모펀드</div>
-    </div>
-    ${rows}
-  </div>`;
 }
 
-function miniBar(val,max) {
-  if (val===null||val===undefined) return `<div class="bar-w"><span class="bnum tv-n">—</span></div>`;
-  const abs=Math.abs(val), w=Math.max(Math.round(abs/max*42),2);
-  const bc=val>0?'b-up':val<0?'b-dn':'b-0';
-  const vc=val>0?'tv-b':val<0?'tv-s':'tv-n';
-  return `<div class="bar-w"><div class="bar ${bc}" style="width:${w}px"></div><span class="bnum ${vc}">${val>0?'+':''}${fmt억(val)}</span></div>`;
-}
-
-const cls  = v => v>0?'up':v<0?'down':'flat';
-const bcls = v => v>0?'bup':v<0?'bdown':'bflat';
+const cls  = v => v > 0 ? 'up'  : v < 0 ? 'down'  : 'flat';
+const bcls = v => v > 0 ? 'bup' : v < 0 ? 'bdown' : 'bflat';
 function fmt억(v) {
-  if(v===null||v===undefined)return'—';
-  const a=Math.abs(v),pre=v<0?'-':'';
-  if(a>=1e12)return pre+(a/1e12).toFixed(1)+'조';
-  if(a>=1e8) return pre+(a/1e8).toFixed(1)+'억';
-  if(a>=1e4) return pre+(a/1e4).toFixed(0)+'만';
+  if (v === null || v === undefined) return '—';
+  const a = Math.abs(v), pre = v < 0 ? '-' : '';
+  if (a >= 1e12) return pre + (a/1e12).toFixed(1) + '조';
+  if (a >= 1e8)  return pre + (a/1e8).toFixed(1)  + '억';
+  if (a >= 1e4)  return pre + (a/1e4).toFixed(0)  + '만';
   return v.toLocaleString();
-}
-function formatDate(d) {
-  return d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2);
 }
 </script>
 </body>
