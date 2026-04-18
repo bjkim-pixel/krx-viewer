@@ -4203,6 +4203,7 @@ def fetch_price(token, code):
         "isAllH": o.get("new_hgpr_lwpr_cls_code") == "1",
         "nh_ratio": ratio, "nh_flag": flag,
         "dept": o.get("bstp_kor_isnm", "").strip(),
+        "amount": si(o.get("acml_tr_pbmn", 0)),  # 당일 거래대금 (원)
     }
 
 
@@ -4265,37 +4266,45 @@ def fetch_investor(token, code, cap_won=0):
 def build_ranking(result, top_n=20):
     """
     거래주체별 랭킹 생성.
-    정렬 기준: 순매수금액/시총 비중(%) 내림차순 (금액 아님)
-    시가총액 필터는 프론트엔드에서 처리하므로 전체 저장.
-    keys: frgn_buy, frgn_sell, inst_buy, inst_sell, indiv_buy, indiv_sell
+    정렬 기준: 순매수액 / 거래대금 비중(%) 내림차순
+      → 시총 대비가 아닌 당일 거래대금 대비 비중 = 시장 영향력을 더 잘 반영
+    시가총액 필터는 프론트에서 처리하므로 전체 200개 저장.
     """
     rows = []
     for code, v in result.items():
         if not v: continue
-        cap = v.get("cap", 0)
+        amount = v.get("amount", 0)  # 당일 거래대금
+        cap    = v.get("cap", 0)
         rows.append({
             "code":   code,
             "name":   v.get("name", code),
             "market": v.get("market", ""),
             "cap":    cap,
+            "amount": amount,
             "frgn":   v.get("frgn")  or 0,
             "inst":   v.get("inst")  or 0,
             "indiv":  v.get("indiv") or 0,
         })
 
-    def top(key, buy=True, n=200):   # 프론트 필터용으로 넉넉히 200개 저장
-        filtered = [r for r in rows if (r[key] > 0 if buy else r[key] < 0)]
-        # 비중 계산 후 비중 기준 정렬
+    def top(key, buy=True, n=200):
+        filtered = [r for r in rows
+                    if (r[key] > 0 if buy else r[key] < 0)
+                    and r["amount"] > 0]   # 거래대금 0이면 제외
+        # 비중 = 순매수액 / 거래대금 (%)
         for r in filtered:
-            r[f"{key}_pct"] = round(abs(r[key]) / r["cap"] * 100, 4) if r["cap"] > 0 else 0.0
-        filtered.sort(key=lambda x: x[f"{key}_pct"], reverse=True)
+            r["pct_val"] = round(abs(r[key]) / r["amount"] * 100, 4)
+        filtered.sort(key=lambda x: x["pct_val"], reverse=True)
         out = []
         for r in filtered[:n]:
-            amt = r[key]
-            pct = r[f"{key}_pct"]
-            out.append({"code": r["code"], "name": r["name"],
-                        "market": r["market"], "cap": r["cap"],
-                        "amt": amt, "pct": pct})
+            out.append({
+                "code":   r["code"],
+                "name":   r["name"],
+                "market": r["market"],
+                "cap":    r["cap"],
+                "amount": r["amount"],
+                "amt":    r[key],
+                "pct":    r["pct_val"],   # 순매수/거래대금 %
+            })
         return out
 
     return {
@@ -4348,16 +4357,17 @@ def build_krx_messages(result, date_str):
         cap  = v.get("cap", 0)
         frgn = v.get("frgn")
         inst = v.get("inst")
-        priv = v.get("indiv")
+        indiv = v.get("indiv")
         all_stocks.append({
             "code":     code,
             "name":     v.get("name", code),
             "market":   v.get("market", ""),
             "cap":      cap,
+            "amount":   v.get("amount", 0),   # 당일 거래대금
             "dept":     v.get("dept", ""),
             "frgn":     frgn,
             "inst":     inst,
-            "priv":     priv,
+            "indiv":    priv,
             "f_consec": v.get("f_consec", 0),
             "i_consec": v.get("i_consec", 0),
             "is52h":    v.get("is52h", False),
@@ -4371,10 +4381,10 @@ def build_krx_messages(result, date_str):
     stocks_4t.sort(key=lambda x: x["fi_sum"], reverse=True)
 
     # ── 비중 계산 헬퍼 ────────────────────────────────────────
-    def pct_of_cap(amt, cap):
-        """순매수금액 / 시가총액 × 100"""
-        if cap <= 0 or amt is None: return 0.0
-        return round(abs(amt) / cap * 100, 2)
+    def pct_of_trade(amt, amount):
+        """순매수금액 / 거래대금 × 100  (거래대금 기준 비중)"""
+        if amount <= 0 or amt is None: return 0.0
+        return round(abs(amt) / amount * 100, 2)
 
     messages = []
 
@@ -4408,7 +4418,7 @@ def build_krx_messages(result, date_str):
         lines = []
         for i, s in enumerate(lst, 1):
             v   = s[key] or 0
-            pct = pct_of_cap(v, s["cap"])
+            pct = pct_of_trade(v, s.get("amount",0))
             mk  = "K" if s["market"] == "KOSPI" else "Q"
             fc  = f" {s['f_consec']}일↑" if key=="frgn" and s["f_consec"]>=2 else ""
             ic  = f" {s['i_consec']}일↑" if key=="inst" and s["i_consec"]>=2 else ""
@@ -4440,15 +4450,15 @@ def build_krx_messages(result, date_str):
 
     # ── 메시지 4: 개인 전체 매수TOP20 / 매도TOP20 ───────────
     p_buy  = sorted([s for s in all_stocks if (s["indiv"] or 0) > 0],
-                    key=lambda x: x["priv"], reverse=True)[:20]
+                    key=lambda x: x["indiv"], reverse=True)[:20]
     p_sell = sorted([s for s in all_stocks if (s["indiv"] or 0) < 0],
-                    key=lambda x: x["priv"])[:20]
+                    key=lambda x: x["indiv"])[:20]
 
     def rank_rows_priv(lst):
         lines = []
         for i, s in enumerate(lst, 1):
             v   = s["indiv"] or 0
-            pct = pct_of_cap(v, s["cap"])
+            pct = pct_of_trade(v, s.get("amount",0))
             mk  = "K" if s["market"] == "KOSPI" else "Q"
             lines.append(
                 f"{i:2d}. <b>{s['name']}</b>[{mk}]  "
@@ -4517,6 +4527,7 @@ def main():
                 "name":     name,
                 "market":   mkt,
                 "cap":      cap,
+                "amount":   price.get("amount", 0),  # 당일 거래대금 (원) — 비중 계산용
                 "is52h":    price.get("is52h",  False),
                 "isAllH":   price.get("isAllH", False),
                 "nh_flag":  price.get("nh_flag", ""),
