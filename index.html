@@ -233,6 +233,16 @@ header{position:sticky;top:0;z-index:200;background:rgba(7,10,15,.97);backdrop-f
 <!-- ── 탭 2: 수급 랭킹 ── -->
 <div class="tab-pane" id="tab-ranking">
   <div class="rk-date" id="rk-date">—</div>
+<div style="padding:0 8px 8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+  <span style="font-size:9px;color:var(--muted);font-family:var(--mono)">시가총액</span>
+  <div class="chips" id="rk-cap-filter" style="margin:0">
+    <div class="chip on" data-v="0">전체</div>
+    <div class="chip" data-v="1000000000000">1조↑</div>
+    <div class="chip" data-v="2000000000000">2조↑</div>
+    <div class="chip" data-v="3000000000000">3조↑</div>
+    <div class="chip" data-v="4000000000000">4조↑</div>
+  </div>
+</div>
   <div id="rk-content">
     <div class="rk-no-data">수급 데이터 없음<br><small style="font-size:10px;color:var(--muted)">Actions 실행 후 수급 불러오기</small></div>
   </div>
@@ -369,7 +379,7 @@ function mergeEnriched(){
   for(const d of allData){
     const e=enriched[d.code]; if(!e)continue;
     d.is52h=e.is52h||false; d.isAllH=e.isAllH||false; d.nh_flag=e.nh_flag||'';;
-    d.frgn=e.frgn??null; d.inst=e.inst??null; d.priv=e.priv??null;
+    d.frgn=e.frgn??null; d.inst=e.inst??null; d.indiv=e.indiv??null;
     d.f_consec=e.f_consec||0; d.i_consec=e.i_consec||0;
     d.volAvg22=e.volAvg22||0; d.volRatio=e.volRatio||0;
     d._inv=e.inv||null; d.dept=e.dept||d.dept||'';;
@@ -377,11 +387,33 @@ function mergeEnriched(){
 }
 
 // ── 수급 랭킹 테이블 (이미지 레이아웃) ────────────────────────
+let rkRanking={}, rkCapFilter=0;
 function renderRankingTable(ranking, generated){
+  rkRanking = ranking;
   $('rk-date').textContent = '기준: '+generated;
-  const keys=['frgn','inst','priv'];
-  const labels={frgn:'외국인',inst:'기관합계',priv:'사모펀드'};
-  const clsMap={frgn:'th-frgn',inst:'th-inst',priv:'th-priv'};
+  // 시가총액 필터 설정
+  const rkCapEl = $('rk-cap-filter');
+  if(rkCapEl && !rkCapEl.dataset.init){
+    rkCapEl.dataset.init='1';
+    rkCapEl.addEventListener('click', e=>{
+      const t=e.target.closest('[data-v]'); if(!t)return;
+      rkCapEl.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));
+      t.classList.add('on');
+      rkCapFilter = Number(t.dataset.v);
+      buildRankTable();
+    });
+  }
+  buildRankTable();
+}
+function buildRankTable(){
+  const ranking = rkRanking;
+  const capMin = rkCapFilter;
+  const generated = $('rk-date').textContent.replace('기준: ','');
+  const keys=['frgn','inst','indiv'];
+  const labels={frgn:'외국인',inst:'기관합계',indiv:'개인'};
+  const clsMap={frgn:'th-frgn',inst:'th-inst',indiv:'th-priv'};
+  // 시가총액 필터 적용
+  function filtered(arr){ return capMin > 0 ? (arr||[]).filter(r=>r.cap>=capMin) : (arr||[]); }
 
   let html='<div class="rk-wrap"><table class="rk-table"><thead><tr>';
   // 헤더: RANK 종목명 비중% 금액(억) | RANK 종목명 비중% 금액(억) | ...
@@ -407,7 +439,7 @@ function renderRankingTable(ranking, generated){
     html+='<tr>';
     keys.forEach((k,ki)=>{
       if(ki>0) html+='<td class="td-sep"></td>';
-      const r=(ranking[k+'_buy']||[])[i];
+      const r=filtered(ranking[k+'_buy'])[i];
       if(r){
         const mk=r.market==='KOSPI'?'K':'Q';
         const amt=Math.round(Math.abs(r.amt)/1e8);
@@ -431,7 +463,7 @@ function renderRankingTable(ranking, generated){
     html+='<tr>';
     keys.forEach((k,ki)=>{
       if(ki>0) html+='<td class="td-sep"></td>';
-      const r=(ranking[k+'_sell']||[])[i];
+      const r=filtered(ranking[k+'_sell'])[i];
       if(r){
         const mk=r.market==='KOSPI'?'K':'Q';
         const amt=Math.round(Math.abs(r.amt)/1e8);
@@ -522,7 +554,7 @@ function cardHTML(d,i){
   else{metrics=`<div class="metrics m2"><div><div class="m-lbl">시가총액</div><div class="m-val">${capStr}</div></div><div><div class="m-lbl">업종</div><div class="m-val" style="font-size:10px">${d.dept||'—'}</div></div></div>`;}
   const vr=d.volRatio||0,vc=vr>=300?'var(--purple)':vr>=150?'var(--orange)':'var(--dim)';
   const volBar=hasVol&&d.volAvg22>0?`<div class="vol-bar"><div class="vol-track"><div class="vol-fill" style="width:${Math.min(vr/500*100,100)}%;background:${vc}"></div></div><span class="vol-lbl" style="color:${vc}">${vr.toFixed(0)}%</span><span class="vol-sub">vs22일평균</span></div>`:'';;
-  const inv=enrichedLoaded?`<div class="inv-row">${iChip('외국인',d.frgn)}${iChip('기관합계',d.inst)}${iChip('사모펀드',d.priv)}</div>`:`<div class="inv-pending">⏳ Actions 실행 후 수급 표시</div>`;
+  const inv=enrichedLoaded?`<div class="inv-row">${iChip('외국인',d.frgn)}${iChip('기관합계',d.inst)}${iChip('개인',d.indiv)}</div>`:`<div class="inv-pending">⏳ Actions 실행 후 수급 표시</div>`;
   return`<div class="card" onclick="goDetail('${d.code}')" id="card-${d.code}" style="animation-delay:${Math.min(i*15,200)}ms"><div class="tag-row">${buildTags(d)}</div><div class="card-top"><div><div class="c-name">${d.name}</div><div class="c-code">${d.code}</div></div><div class="c-right"><div class="c-price ${rc}">${(d.close||0).toLocaleString()}</div><span class="rate-b ${rbc} ${rc}">${sign}${d.rate}% (${d.diff>0?'+':''}${(d.diff||0).toLocaleString()})</span></div></div>${metrics}${volBar}${inv}</div>`;
 }
 function iChip(l,v){
