@@ -7,7 +7,7 @@ Market Radar와 동일한 방식으로 KIS API 수급/신고가 조회.
 수집 대상: KOSPI + KOSDAQ 시가총액 상위 종목
 조회 항목:
   - 52주/역대 신고가 (FHKST01010100)
-  - 외국인/기관/사모 수급 (FHKST01010900) ← Market Radar 방식
+  - 외국인/기관/개인 수급 (FHKST01010900) ← Market Radar 방식
 결과 → data/enriched.json
 """
 
@@ -4207,8 +4207,13 @@ def fetch_price(token, code):
 
 
 # ── 수급 (FHKST01010900) ─────────────────────────────────────────
-def fetch_investor(token, code):
-    """Market Radar fetch_stock_investor_history 동일 방식"""
+def fetch_investor(token, code, cap_won=0):
+    """
+    투자자 매매동향 30일 (FHKST01010900)
+    Market Radar 방식 동일:
+      frgn = 외국인, inst = 기관합계, indiv = 개인
+      (개인 pvt_fund_ntby_tr_pbmn은 데이터가 거의 없어 개인으로 대체)
+    """
     d = kis_get("/uapi/domestic-stock/v1/quotations/inquire-investor",
         {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code},
         "FHKST01010900", token)
@@ -4217,28 +4222,40 @@ def fetch_investor(token, code):
 
     hist = []
     for r in rows:
+        famt = sf(r.get("frgn_ntby_tr_pbmn", 0)) * 1_000_000
+        iamt = sf(r.get("orgn_ntby_tr_pbmn", 0)) * 1_000_000
+        pamt = sf(r.get("prsn_ntby_tr_pbmn", 0)) * 1_000_000  # 개인
+        # Phase 판정 (마켓레이더 determine_daily_phase 방식)
+        if famt > 0 and iamt > 0:   phase, phase_key = "매집", "golden"
+        elif famt > 0:              phase, phase_key = "외인↑", "p2"
+        elif iamt > 0:              phase, phase_key = "기관↑", "p1"
+        elif famt < 0 and iamt < 0: phase, phase_key = "이탈",  "p3"
+        else:                       phase, phase_key = "-",     ""
+        # 매직지수 = (외인+기관) / 시총 * 100
+        magic = round((famt + iamt) / cap_won * 100, 4) if cap_won > 0 else 0.0
+
         hist.append({
             "date":     r.get("stck_bsop_date", ""),
             "frgn_qty": si(r.get("frgn_ntby_qty", 0)),
             "inst_qty": si(r.get("orgn_ntby_qty", 0)),
-            "frgn": sf(r.get("frgn_ntby_tr_pbmn", 0)) * 1_000_000,
-            "inst": sf(r.get("orgn_ntby_tr_pbmn", 0)) * 1_000_000,
-            "priv": sf(r.get("pvt_fund_ntby_tr_pbmn", 0)) * 1_000_000,
+            "frgn":  famt,
+            "inst":  iamt,
+            "indiv": pamt,   # 개인 (개인 대체)
+            "magic": magic,
+            "phase": phase, "phase_key": phase_key,
             "close": 0, "rate": 0.0, "volume": 0,
         })
 
-    # 연속 순매수일 계산
-    f_consec = sum(1 for _ in
-        __import__("itertools").takewhile(lambda r: r["frgn_qty"] > 0, hist))
-    i_consec = sum(1 for _ in
-        __import__("itertools").takewhile(lambda r: r["inst_qty"] > 0, hist))
+    # 연속 순매수일
+    f_consec = sum(1 for _ in itertools.takewhile(lambda r: r["frgn_qty"] > 0, hist))
+    i_consec = sum(1 for _ in itertools.takewhile(lambda r: r["inst_qty"] > 0, hist))
 
-    t = hist[0] if hist else {}
+    t  = hist[0] if hist else {}
     sp = lambda n, k: sum(r.get(k, 0) for r in hist[:n])
     return {
-        "today": {"frgn": t.get("frgn",0), "inst": t.get("inst",0), "priv": t.get("priv",0)},
-        "week":  {"frgn": sp(5,"frgn"),  "inst": sp(5,"inst"),  "priv": sp(5,"priv")},
-        "month": {"frgn": sp(22,"frgn"), "inst": sp(22,"inst"), "priv": sp(22,"priv")},
+        "today": {"frgn": t.get("frgn",0), "inst": t.get("inst",0), "indiv": t.get("indiv",0)},
+        "week":  {"frgn": sp(5,"frgn"),  "inst": sp(5,"inst"),  "indiv": sp(5,"indiv")},
+        "month": {"frgn": sp(22,"frgn"), "inst": sp(22,"inst"), "indiv": sp(22,"indiv")},
         "f_consec": f_consec, "i_consec": i_consec,
         "daily": hist[:15],
     }
@@ -4247,9 +4264,10 @@ def fetch_investor(token, code):
 # ── 메인 ─────────────────────────────────────────────────────────
 def build_ranking(result, top_n=20):
     """
-    사이트 표시 및 텔레그램용 거래주체별 TOP20 랭킹 생성
-    keys: frgn_buy, frgn_sell, inst_buy, inst_sell, priv_buy, priv_sell
-    각 항목: [{code, name, market, cap, amt, pct}, ...]
+    거래주체별 랭킹 생성.
+    정렬 기준: 순매수금액/시총 비중(%) 내림차순 (금액 아님)
+    시가총액 필터는 프론트엔드에서 처리하므로 전체 저장.
+    keys: frgn_buy, frgn_sell, inst_buy, inst_sell, indiv_buy, indiv_sell
     """
     rows = []
     for code, v in result.items():
@@ -4260,30 +4278,33 @@ def build_ranking(result, top_n=20):
             "name":   v.get("name", code),
             "market": v.get("market", ""),
             "cap":    cap,
-            "frgn":   v.get("frgn") or 0,
-            "inst":   v.get("inst") or 0,
-            "priv":   v.get("priv") or 0,
+            "frgn":   v.get("frgn")  or 0,
+            "inst":   v.get("inst")  or 0,
+            "indiv":  v.get("indiv") or 0,
         })
 
-    def top(key, buy=True, n=top_n):
+    def top(key, buy=True, n=200):   # 프론트 필터용으로 넉넉히 200개 저장
         filtered = [r for r in rows if (r[key] > 0 if buy else r[key] < 0)]
-        filtered.sort(key=lambda x: x[key], reverse=buy)
+        # 비중 계산 후 비중 기준 정렬
+        for r in filtered:
+            r[f"{key}_pct"] = round(abs(r[key]) / r["cap"] * 100, 4) if r["cap"] > 0 else 0.0
+        filtered.sort(key=lambda x: x[f"{key}_pct"], reverse=True)
         out = []
         for r in filtered[:n]:
             amt = r[key]
-            pct = round(abs(amt) / r["cap"] * 100, 2) if r["cap"] > 0 else 0.0
+            pct = r[f"{key}_pct"]
             out.append({"code": r["code"], "name": r["name"],
                         "market": r["market"], "cap": r["cap"],
                         "amt": amt, "pct": pct})
         return out
 
     return {
-        "frgn_buy":  top("frgn", True),
-        "frgn_sell": top("frgn", False),
-        "inst_buy":  top("inst", True),
-        "inst_sell": top("inst", False),
-        "priv_buy":  top("priv", True),
-        "priv_sell": top("priv", False),
+        "frgn_buy":   top("frgn",  True),
+        "frgn_sell":  top("frgn",  False),
+        "inst_buy":   top("inst",  True),
+        "inst_sell":  top("inst",  False),
+        "indiv_buy":  top("indiv", True),
+        "indiv_sell": top("indiv", False),
     }
 
 
@@ -4327,7 +4348,7 @@ def build_krx_messages(result, date_str):
         cap  = v.get("cap", 0)
         frgn = v.get("frgn")
         inst = v.get("inst")
-        priv = v.get("priv")
+        priv = v.get("indiv")
         all_stocks.append({
             "code":     code,
             "name":     v.get("name", code),
@@ -4417,16 +4438,16 @@ def build_krx_messages(result, date_str):
     )
     messages.append(msg3)
 
-    # ── 메시지 4: 사모펀드 전체 매수TOP20 / 매도TOP20 ───────────
-    p_buy  = sorted([s for s in all_stocks if (s["priv"] or 0) > 0],
+    # ── 메시지 4: 개인 전체 매수TOP20 / 매도TOP20 ───────────
+    p_buy  = sorted([s for s in all_stocks if (s["indiv"] or 0) > 0],
                     key=lambda x: x["priv"], reverse=True)[:20]
-    p_sell = sorted([s for s in all_stocks if (s["priv"] or 0) < 0],
+    p_sell = sorted([s for s in all_stocks if (s["indiv"] or 0) < 0],
                     key=lambda x: x["priv"])[:20]
 
     def rank_rows_priv(lst):
         lines = []
         for i, s in enumerate(lst, 1):
-            v   = s["priv"] or 0
+            v   = s["indiv"] or 0
             pct = pct_of_cap(v, s["cap"])
             mk  = "K" if s["market"] == "KOSPI" else "Q"
             lines.append(
@@ -4436,7 +4457,7 @@ def build_krx_messages(result, date_str):
         return "\n".join(lines) if lines else "  없음"
 
     msg4 = (
-        f"🏦 <b>[ 사모펀드 시총대비 매수순위 ]</b>  {now_str}\n\n"
+        f"👤 <b>[ 개인 시총대비 매수순위 ]</b>  {now_str}\n\n"
         f"▲ 순매수 TOP20\n{rank_rows_priv(p_buy)}\n\n"
         f"▽ 순매도 TOP20\n{rank_rows_priv(p_sell)}"
     )
@@ -4490,7 +4511,7 @@ def main():
         try:
             print(f"[{idx:4d}/{total}] {code} {name}")
             price = fetch_price(token, code);    time.sleep(DELAY)
-            inv   = fetch_investor(token, code); time.sleep(DELAY)
+            inv   = fetch_investor(token, code, cap_won=cap); time.sleep(DELAY)
 
             result[code] = clean({
                 "name":     name,
@@ -4501,9 +4522,9 @@ def main():
                 "nh_flag":  price.get("nh_flag", ""),
                 "nh_ratio": price.get("nh_ratio", 0),
                 "dept":     price.get("dept", ""),
-                "frgn":     inv["today"]["frgn"] if inv else None,
-                "inst":     inv["today"]["inst"] if inv else None,
-                "priv":     inv["today"]["priv"] if inv else None,
+                "frgn":     inv["today"]["frgn"]  if inv else None,
+                "inst":     inv["today"]["inst"]  if inv else None,
+                "indiv":    inv["today"]["indiv"] if inv else None,
                 "f_consec": inv.get("f_consec", 0) if inv else 0,
                 "i_consec": inv.get("i_consec", 0) if inv else 0,
                 "volAvg22": 0, "volRatio": 0,
