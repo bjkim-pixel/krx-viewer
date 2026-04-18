@@ -479,7 +479,7 @@ function buildRkLists(){
   // 메타 정보
   const total = buyData.length + sellData.length;
   $('rk-meta').innerHTML=total
-    ? `<span class="rk-meta-item">정렬: <span>비중(순매수/시총)%</span></span><span class="rk-meta-item">매수 ${buyData.length}종목 · 매도 ${sellData.length}종목</span>`
+    ? `<span class="rk-meta-item">정렬: <span>비중(순매수/거래대금)%</span></span><span class="rk-meta-item">매수 ${buyData.length}종목 · 매도 ${sellData.length}종목</span>`
     : '<span class="rk-meta-item">수급 데이터 없음</span>';
 }
 function rkItems(list, isBuy){
@@ -489,10 +489,12 @@ function rkItems(list, isBuy){
     const mk=r.market==='KOSPI'?'K':'Q';
     const sign=isBuy?'+':'-';
     const amt=fmt억(Math.abs(r.amt));
+    // pct = 순매수액/거래대금 %
+    const pctStr=r.pct.toFixed(2)+'%';
     return`<div class="rk-item" onclick="goDetailByCode('${r.code}')">
       <span class="rk-n">${i+1}</span>
       <div class="rk-info"><div class="rk-name">${r.name}</div><div class="rk-mk">[${mk}] ${fmt조(r.cap)}</div></div>
-      <div class="rk-nums"><div class="rk-amt ${cls}">${sign}${amt}</div><div class="rk-pct">${r.pct.toFixed(2)}%</div></div>
+      <div class="rk-nums"><div class="rk-amt ${cls}">${sign}${amt}</div><div class="rk-pct" title="순매수/거래대금">${pctStr}</div></div>
     </div>`;
   }).join('');
 }
