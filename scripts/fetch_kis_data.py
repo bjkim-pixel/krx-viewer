@@ -4288,24 +4288,26 @@ def build_ranking(result, top_n=20):
 
     def top(key, buy=True, n=200):
         filtered = [r for r in rows
-                    if (r[key] > 0 if buy else r[key] < 0)
-                    and r["amount"] > 0]   # 거래대금 0이면 제외
-        # 비중 = 순매수액 / 거래대금 (%)
-        for r in filtered:
-            r["pct_val"] = round(abs(r[key]) / r["amount"] * 100, 4)
-        filtered.sort(key=lambda x: x["pct_val"], reverse=True)
+                    if (r[key] > 0 if buy else r[key] < 0)]
         out = []
-        for r in filtered[:n]:
+        for r in filtered:
+            amt    = r[key]
+            amount = r["amount"]
+            # 거래대금 없으면 시총 2%로 추정 (HTS 평균 회전율 근사)
+            denom  = amount if amount > 0 else (r["cap"] * 0.02 if r["cap"] > 0 else 0)
+            pct    = round(abs(amt) / denom * 100, 4) if denom > 0 else 0.0
             out.append({
                 "code":   r["code"],
                 "name":   r["name"],
                 "market": r["market"],
                 "cap":    r["cap"],
-                "amount": r["amount"],
-                "amt":    r[key],
-                "pct":    r["pct_val"],   # 순매수/거래대금 %
+                "amount": amount,
+                "amt":    amt,
+                "pct":    pct,
             })
-        return out
+        # 비중 내림차순, 비중 같으면 절대금액 내림차순
+        out.sort(key=lambda x: (x["pct"], abs(x["amt"])), reverse=True)
+        return out[:n]
 
     return {
         "frgn_buy":   top("frgn",  True),
@@ -4559,9 +4561,15 @@ def main():
     n52h  = sum(1 for v in result.values() if v.get("is52h"))
     nAllH = sum(1 for v in result.values() if v.get("isAllH"))
     nFrgn = sum(1 for v in result.values() if (v.get("frgn") or 0) > 0)
+    nAmt  = sum(1 for v in result.values() if (v.get("amount") or 0) > 0)
+    rk    = out.get("ranking", {})
     print(f"\n{'='*55}")
     print(f"✅ 완료: {total}개 → data/enriched.json")
-    print(f"   52주신고가 {n52h}개 | 역대신고가 {nAllH}개 | 외국인순매수 {nFrgn}개")
+    print(f"   52주신고가: {n52h}개  역대신고가: {nAllH}개")
+    print(f"   외국인 순매수 종목: {nFrgn}개")
+    print(f"   거래대금 수집 종목: {nAmt}개 / {total}개")
+    print(f"   ranking.frgn_buy: {len(rk.get('frgn_buy',[]))}개")
+    print(f"   ranking.inst_buy: {len(rk.get('inst_buy',[]))}개")
     print(f"{'='*55}")
 
     # ── 텔레그램 전송 ──────────────────────────────────────────
