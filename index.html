@@ -409,11 +409,23 @@ async function loadEnriched(){
 async function tryFetchEnriched(){
   try{
     const res=await fetch('data/enriched.json?_='+Date.now());
-    if(!res.ok)return false;
+    if(!res.ok){ console.log('[enriched] fetch 실패:',res.status); return false; }
     const j=await res.json();
-    if(!j.data||!Object.keys(j.data).length)return false;
+    console.log('[enriched] keys:', Object.keys(j));
+    console.log('[enriched] total:', j.total);
+    console.log('[enriched] has ranking:', !!j.ranking);
+    if(!j.data||!Object.keys(j.data).length){ console.log('[enriched] data 없음'); return false; }
     enriched=j.data; enrichedLoaded=true;
-    rkRaw=j.ranking||{};
+
+    // ranking이 없거나 비어있으면 data에서 직접 계산
+    if(j.ranking && Object.keys(j.ranking).length > 0){
+      rkRaw=j.ranking;
+      console.log('[enriched] ranking 사용, frgn_buy 수:', (j.ranking.frgn_buy||[]).length);
+    } else {
+      console.log('[enriched] ranking 없음 → data에서 직접 계산');
+      rkRaw = calcRankingFromData(j.data);
+    }
+
     updateEnrichBadge(j.generated||j.date||'');
     $('action-banner').style.display='none';
     $('s-frgn').style.display=''; $('s-inst').style.display='';
@@ -423,7 +435,48 @@ async function tryFetchEnriched(){
     buildRkLists();
     if(allData.length)render();
     return true;
-  }catch{return false;}
+  }catch(e){ console.error('[enriched] 오류:', e); return false; }
+}
+
+// enriched.json의 data에서 직접 랭킹 계산 (ranking 키 없을 때 fallback)
+function calcRankingFromData(data){
+  const rows = [];
+  for(const [code, v] of Object.entries(data)){
+    if(!v || !v.name) continue;
+    const frgn  = v.frgn  || 0;
+    const inst  = v.inst  || 0;
+    const indiv = v.indiv || 0;
+    const cap   = v.cap   || 0;
+    // amount 없으면 cap의 2%로 추정 (fallback — 거래대금 미수집 시)
+    const amount = v.amount > 0 ? v.amount : (cap > 0 ? cap * 0.02 : 0);
+    rows.push({ code, name:v.name, market:v.market||'', cap, amount, frgn, inst, indiv });
+  }
+  console.log('[calcRanking] 종목수:', rows.length);
+
+  function top(key, buy, n=200){
+    let filtered = rows.filter(r => buy ? r[key]>0 : r[key]<0);
+    // amount 있으면 거래대금 대비, 없으면 절대값 기준
+    filtered = filtered.map(r => ({
+      ...r,
+      pct: r.amount > 0 ? Math.round(Math.abs(r[key])/r.amount*100*100)/100 : 0
+    }));
+    filtered.sort((a,b) => b.pct - a.pct || Math.abs(b[key]) - Math.abs(a[key]));
+    return filtered.slice(0,n).map(r => ({
+      code:r.code, name:r.name, market:r.market, cap:r.cap,
+      amount:r.amount, amt:r[key], pct:r.pct
+    }));
+  }
+
+  const result = {
+    frgn_buy:  top('frgn',  true),
+    frgn_sell: top('frgn',  false),
+    inst_buy:  top('inst',  true),
+    inst_sell: top('inst',  false),
+    indiv_buy: top('indiv', true),
+    indiv_sell:top('indiv', false),
+  };
+  console.log('[calcRanking] frgn_buy:', result.frgn_buy.length, '건');
+  return result;
 }
 function mergeEnriched(){
   for(const d of allData){
@@ -472,8 +525,12 @@ function buildRkLists(){
   const lbl=labels[rkTabKey]||rkTabKey;
   $('rk-buy-hdr').textContent=`▲ ${lbl} 순매수 TOP20`;
   $('rk-sell-hdr').textContent=`▽ ${lbl} 순매도 TOP20`;
-  const buyData=(rkRaw[rkTabKey+'_buy']||[]).filter(r=>rkCap===0||r.cap>=rkCap);
-  const sellData=(rkRaw[rkTabKey+'_sell']||[]).filter(r=>rkCap===0||r.cap>=rkCap);
+  const rawBuy  = rkRaw[rkTabKey+'_buy']  || [];
+  const rawSell = rkRaw[rkTabKey+'_sell'] || [];
+  console.log(`[buildRkLists] key=${rkTabKey} buy=${rawBuy.length} sell=${rawSell.length} capFilter=${rkCap}`);
+  const buyData  = rkCap===0 ? rawBuy  : rawBuy.filter(r=>r.cap>=rkCap);
+  const sellData = rkCap===0 ? rawSell : rawSell.filter(r=>r.cap>=rkCap);
+  console.log(`[buildRkLists] after filter buy=${buyData.length} sell=${sellData.length}`);
   $('rk-buy-list').innerHTML  = rkItems(buyData.slice(0,20), true);
   $('rk-sell-list').innerHTML = rkItems(sellData.slice(0,20), false);
   // 메타 정보
