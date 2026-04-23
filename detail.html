@@ -133,10 +133,37 @@ header{background:rgba(7,10,15,.97);backdrop-filter:blur(16px);border-bottom:1px
 const $ = id => document.getElementById(id);
 let s = null;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const raw = sessionStorage.getItem('detail_stock');
   if (!raw) { history.back(); return; }
   s = JSON.parse(raw);
+  console.log('[detail] s.code:', s.code, '_inv:', !!s._inv, 'frgn:', s.frgn);
+
+  // _inv가 없으면 enriched.json에서 직접 보완
+  if (!s._inv || s.frgn === null) {
+    try {
+      const res = await fetch('data/enriched.json?_='+Date.now());
+      if (res.ok) {
+        const j = await res.json();
+        const code6 = String(s.code||'').padStart(6,'0');
+        const e = (j.data||{})[code6];
+        console.log('[detail] enriched 보완:', code6, '→ found:', !!e);
+        if (e) {
+          if (s.frgn  === null || s.frgn  === undefined) s.frgn  = e.frgn  ?? null;
+          if (s.inst  === null || s.inst  === undefined) s.inst  = e.inst  ?? null;
+          if (s.indiv === null || s.indiv === undefined) s.indiv = e.indiv ?? null;
+          if (!s._inv && e.inv) s._inv = e.inv;
+          s.f_consec = e.f_consec || s.f_consec || 0;
+          s.i_consec = e.i_consec || s.i_consec || 0;
+          s.is52h    = e.is52h    || s.is52h    || false;
+          s.isAllH   = e.isAllH   || s.isAllH   || false;
+          s.nh_flag  = e.nh_flag  || s.nh_flag  || '';
+          s.dept     = e.dept     || s.dept     || '';
+        }
+      }
+    } catch(err) { console.warn('[detail] enriched fetch 실패:', err); }
+  }
+
   renderHeader();
   renderBasic();
   renderSupply();
@@ -191,12 +218,14 @@ function renderSupply() {
   function fillRow(elId, data) {
     const el = $(elId);
     ['frgn','inst','indiv'].forEach(k => {
-      const v = data[k] ?? null;
+      const v = (data && data[k] !== undefined) ? data[k] : null;
       const vc = v === null ? 'flat' : v > 0 ? 'up' : v < 0 ? 'down' : 'flat';
       el.innerHTML += `<div class="supply-val ${vc}">${v === null ? '—' : (v>0?'+':'')+fmt억(v)}</div>`;
     });
   }
-  fillRow('sup-today', inv.today || {});
+  // today를 inv.today에서 먼저 시도, 없으면 s에서 직접
+  const todayData = inv.today || {frgn: s.frgn||null, inst: s.inst||null, indiv: s.indiv||null};
+  fillRow('sup-today', todayData);
   fillRow('sup-week',  inv.week  || {});
   fillRow('sup-month', inv.month || {});
 }
@@ -224,8 +253,8 @@ function renderDaily() {
     $('daily-body').innerHTML = '<div style="padding:16px;text-align:center;font-size:11px;color:var(--muted)">일별 데이터 없음</div>';
     return;
   }
-  // 마켓레이더 방식: 최신일이 상단 (daily는 이미 오래된→최신 순이므로 reverse)
-  const rows = [...daily].reverse();
+  // daily[0]이 최신일 (fetch_investor에서 가장 최근 날짜가 먼저)
+  const rows = [...daily]; // reverse 불필요 - hist[0]이 이미 최신
   $('daily-body').innerHTML = rows.map(r => {
     const dt = r.date || '';
     const dtFmt = dt.length >= 8 ? dt.slice(4,6)+'/'+dt.slice(6,8) : '—';
