@@ -479,17 +479,29 @@ function calcRankingFromData(data){
   return result;
 }
 function mergeEnriched(){
+  let matched=0, total=allData.length;
   for(const d of allData){
-    const e=enriched[d.code]; if(!e)continue;
+    // code를 6자리로 정규화 (숫자 파싱 후 앞 0 복원)
+    const code6 = String(d.code||'').replace(/'/g,'').padStart(6,'0');
+    d.code = code6;  // 정규화된 code로 업데이트
+    const e=enriched[code6]; if(!e)continue;
+    matched++;
     d.is52h=e.is52h||false; d.isAllH=e.isAllH||false; d.nh_flag=e.nh_flag||'';
     d.frgn=e.frgn??null; d.inst=e.inst??null; d.indiv=e.indiv??null;
     d.f_consec=e.f_consec||0; d.i_consec=e.i_consec||0;
     d.volAvg22=e.volAvg22||0; d.volRatio=e.volRatio||0;
     d._inv=e.inv||null; d.dept=e.dept||d.dept||'';
-    // 매직지수: 외인+기관 / 시총
     if(d.cap>0&&e.frgn!=null&&e.inst!=null)
       d.magic=Math.round((e.frgn+e.inst)/d.cap*100*1e4)/1e4;
     else d.magic=null;
+  }
+  console.log(`[mergeEnriched] allData ${total}개 중 enriched 매칭 ${matched}개`);
+  if(matched===0 && total>0){
+    // 샘플 비교로 원인 파악
+    const sample=allData[0];
+    const enrichedKeys=Object.keys(enriched);
+    console.log('[mergeEnriched] allData 샘플 code:', JSON.stringify(sample?.code));
+    console.log('[mergeEnriched] enriched 샘플 key:', JSON.stringify(enrichedKeys[0]));
   }
 }
 
@@ -564,7 +576,7 @@ function parseRows(raw){
   hasVol=cols.some(c=>c.includes('거래량'));
   hasPQ=hasVol&&cols.some(c=>c.includes('상장주식수'));
   return raw.map(r=>{
-    const code=String(r['종목코드']||'').replace(/'/g,'').padStart(6,'0');
+    const raw_code=r['종목코드']; const code=String(raw_code===null||raw_code===undefined?'':raw_code).replace(/'/g,'').replace(/\s/g,'').padStart(6,'0');
     if(!code||code==='000000')return null;
     const rate=toF(r['등락률'])??0;
     const cap=toI(r['시가총액']||0);
@@ -664,21 +676,57 @@ function iChip(l,v){
   return`<div class="inv-c"><div class="inv-lbl">${l}</div><div class="inv-val ${vc}">${pre}${s}</div></div>`;
 }
 function goDetail(code){
-  const s=allData.find(d=>d.code===code); if(!s)return;
-  // enriched 데이터 병합
-  const e=enriched[code]||{};
-  const merged={...s,...(Object.keys(e).length?{_inv:e.inv||s._inv}:{})};
-  try{sessionStorage.setItem('detail_stock',JSON.stringify(merged));}
-  catch{sessionStorage.setItem('detail_stock',JSON.stringify({...s,_inv:null}));}
+  const code6=String(code).padStart(6,'0');
+  const s=allData.find(d=>d.code===code6||d.code===code); if(!s)return;
+  const e=enriched[code6]||enriched[code]||{};
+  // _inv를 반드시 enriched에서 가져오기 (allData에는 없을 수 있음)
+  const merged={
+    ...s,
+    frgn:  e.frgn  ??s.frgn,
+    inst:  e.inst  ??s.inst,
+    indiv: e.indiv ??s.indiv,
+    f_consec: e.f_consec||s.f_consec||0,
+    i_consec: e.i_consec||s.i_consec||0,
+    is52h:  e.is52h  ||s.is52h  ||false,
+    isAllH: e.isAllH ||s.isAllH ||false,
+    nh_flag:e.nh_flag||s.nh_flag||'',
+    dept:   e.dept   ||s.dept   ||'',
+    _inv:   e.inv    ||s._inv   ||null,
+  };
+  console.log('[goDetail] code:', code6, '_inv:', !!merged._inv, 'frgn:', merged.frgn);
+  try{
+    sessionStorage.setItem('detail_stock', JSON.stringify(merged));
+  }catch(err){
+    const lite={...merged, _inv:null};
+    sessionStorage.setItem('detail_stock', JSON.stringify(lite));
+    console.warn('[goDetail] _inv 제외 저장 (용량 초과)');
+  }
   window.location.href='detail.html';
 }
 function goDetailByCode(code){
-  const s=allData.find(d=>d.code===code);
-  const e=enriched[code]||{};
-  const base=s||{code,name:e.name||code,market:e.market||'',dept:e.dept||'',cap:e.cap||0,close:0,diff:0,rate:0};
-  const merged={...base,...e,_inv:e.inv||base._inv||null};
-  try{sessionStorage.setItem('detail_stock',JSON.stringify(merged));}
-  catch{sessionStorage.setItem('detail_stock',JSON.stringify({code,name:e.name||code}));}
+  const code6=String(code).padStart(6,'0');
+  const s=allData.find(d=>d.code===code6||d.code===code);
+  const e=enriched[code6]||enriched[code]||{};
+  const base=s||{code:code6,name:e.name||code6,market:e.market||'',dept:e.dept||'',
+    cap:e.cap||0,close:0,diff:0,rate:0,frgn:null,inst:null,indiv:null};
+  const merged={
+    ...base,
+    frgn:  e.frgn  ??base.frgn,
+    inst:  e.inst  ??base.inst,
+    indiv: e.indiv ??base.indiv,
+    f_consec: e.f_consec||base.f_consec||0,
+    i_consec: e.i_consec||base.i_consec||0,
+    is52h:  e.is52h  ||base.is52h  ||false,
+    isAllH: e.isAllH ||base.isAllH ||false,
+    nh_flag:e.nh_flag||base.nh_flag||'',
+    dept:   e.dept   ||base.dept   ||'',
+    _inv:   e.inv    ||base._inv   ||null,
+  };
+  try{
+    sessionStorage.setItem('detail_stock', JSON.stringify(merged));
+  }catch(err){
+    sessionStorage.setItem('detail_stock', JSON.stringify({...merged, _inv:null}));
+  }
   window.location.href='detail.html';
 }
 function setupFilters(){
