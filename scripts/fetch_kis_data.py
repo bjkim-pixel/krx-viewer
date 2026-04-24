@@ -11,7 +11,7 @@ Market Radar와 동일한 방식으로 KIS API 수급/신고가 조회.
 결과 → data/enriched.json
 """
 
-import os, sys, json, math, time, requests
+import os, sys, json, math, time, requests, itertools
 from datetime import datetime, timedelta
 from pathlib import Path
 
